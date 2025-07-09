@@ -1,0 +1,82 @@
+[
+  {
+    "id": "8ab1c2d3-4e5f-6789-abcd-ef0123456789",
+    "numberCase": "2024-001",
+    "involved": "Juan Carlos Rodríguez",
+    "notificationDate": "2024-01-15",
+    "amount": "15000000",
+    "status": "ON_TIME"
+  },
+  {
+    "id": "9bc2d3e4-5f6g-789a-bcde-f01234567890",
+    "numberCase": "2024-002",
+    "involved": "María Fernanda López",
+    "notificationDate": "2024-01-20",
+    "amount": "8500000",
+    "status": "ABOUT_TO_EXPIRE"
+  },
+  {
+    "id": "acd3e4f5-6g7h-89ab-cdef-012345678901",
+    "numberCase": "2024-003",
+    "involved": "Pedro Antonio Gómez",
+    "notificationDate": "2024-02-05",
+    "amount": "25000000",
+    "status": "EXPIRED"
+  },
+  {
+    "id": "bde4f5g6-7h8i-9abc-def0-123456789012",
+    "numberCase": "2024-004",
+    "involved": "Ana Sofía Martínez",
+    "notificationDate": "2024-02-12",
+    "amount": "12000000",
+    "status": "FINISHED"
+  },
+  {
+    "id": "cef5g6h7-8i9j-abcd-ef01-234567890123",
+    "numberCase": "2024-005",
+    "involved": "Carlos Eduardo Jiménez",
+    "notificationDate": "2024-02-18",
+    "amount": "18750000",
+    "status": "ON_TIME"
+  },
+  {
+    "id": "def6h7i8-9j0k-bcde-f012-345678901234",
+    "numberCase": "2024-006",
+    "involved": "Lucía Beatriz Herrera",
+    "notificationDate": "2024-03-01",
+    "amount": "9200000",
+    "status": "ABOUT_TO_EXPIRE"
+  },
+  {
+    "id": "efg7i8j9-0k1l-cdef-0123-456789012345",
+    "numberCase": "2024-007",
+    "involved": "Roberto Alejandro Silva",
+    "notificationDate": "2024-03-08",
+    "amount": "22500000",
+    "status": "EXPIRED"
+  },
+  {
+    "id": "fgh8j9k0-1l2m-def0-1234-567890123456",
+    "numberCase": "2024-008",
+    "involved": "Carmen Teresa Vargas",
+    "notificationDate": "2024-03-15",
+    "amount": "14800000",
+    "status": "FINISHED"
+  },
+  {
+    "id": "ghi9k0l1-2m3n-ef01-2345-678901234567",
+    "numberCase": "2024-009",
+    "involved": "Miguel Ángel Torres",
+    "notificationDate": "2024-03-22",
+    "amount": "11300000",
+    "status": "ON_TIME"
+  },
+  {
+    "id": "hij0l1m2-3n4o-f012-3456-789012345678",
+    "numberCase": "2024-010",
+    "involved": "Valentina Ruiz Castillo",
+    "notificationDate": "2024-04-02",
+    "amount": "16750000",
+    "status": "ABOUT_TO_EXPIRE"
+  }
+]
