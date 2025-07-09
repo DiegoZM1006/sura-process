@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { CheckIcon } from "lucide-react"
 import TiptapEditor from "@/components/tiptap-editor"
 import { StepOne } from "@/components/case-creation/step-one"
@@ -8,8 +9,16 @@ import { StepTwo } from "@/components/case-creation/step-two"
 import { StepThree } from "@/components/case-creation/step-three"
 import { EditorFooter } from "@/components/case-creation/editor-footer"
 
+// Mapeo de tipos de casos
+const CASE_TYPE_MAPPING: Record<string, string> = {
+    "rce-daños": "RECLAMACION RCE DAÑOS",
+    "rce-hurto": "RECLAMACION RCE HURTO"
+}
+
 export default function CreateCasePage() {
+    const searchParams = useSearchParams()
     const [currentStep, setCurrentStep] = useState(1)
+    const [caseType, setCaseType] = useState<string>("")
     const [steps, setSteps] = useState([
         { id: 1, name: "Información Básica", status: "current" },
         { id: 2, name: "Anexos", status: "upcoming" },
@@ -32,6 +41,14 @@ export default function CreateCasePage() {
         cuantias: "",
         polizaAsegurado: "",
     })
+
+    // Obtener el tipo de caso de los parámetros de búsqueda
+    useEffect(() => {
+        const typeCase = searchParams?.get('typeCase')
+        if (typeCase && CASE_TYPE_MAPPING[typeCase]) {
+            setCaseType(CASE_TYPE_MAPPING[typeCase])
+        }
+    }, [searchParams])
 
     const handleInputChange = (field: string, value: string) => {
         setFormData(prev => ({ ...prev, [field]: value }))
@@ -177,8 +194,10 @@ export default function CreateCasePage() {
 
                 {/* Editor - 2/3 del ancho */}
                 <div className="w-2/3">
-                    <div className="h-screen sticky top-6 overflow-y-auto">
-                        <TiptapEditor />
+                    <div className="h-[calc(100vh-100px)] sticky top-6 overflow-hidden flex flex-col">
+                        <div className="flex-1 overflow-hidden">
+                            <TiptapEditor formData={formData} caseType={caseType} />
+                        </div>
                         <EditorFooter
                             currentStep={currentStep}
                             totalSteps={steps.length}
