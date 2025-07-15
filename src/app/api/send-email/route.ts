@@ -74,15 +74,21 @@ export async function POST(request: NextRequest) {
     // Extraer datos del formulario para generar el documento
     console.log('Extrayendo datos del formulario...')
     const documentData: any = {}
+    const anexoFiles: File[] = []
     
     for (const [key, value] of formData.entries()) {
-      if (!key.startsWith('email') && key !== 'caseType') {
+      if (key === 'anexos' && value instanceof File) {
+        // Recolectar archivos anexos del step 2
+        anexoFiles.push(value)
+        console.log(`Anexo encontrado: ${value.name} (${value.size} bytes)`)
+      } else if (!key.startsWith('email') && key !== 'caseType') {
         documentData[key] = value
       }
     }
     
     console.log('Datos extraídos para documento:', {
       keys: Object.keys(documentData),
+      anexosCount: anexoFiles.length,
       caseType,
       sampleData: {
         nombreEmpresa: documentData.nombreEmpresa,
@@ -148,6 +154,34 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Error procesando el documento principal' },
         { status: 500 }
       )
+    }
+
+    // Añadir anexos del step 2 como archivos adjuntos separados
+    if (anexoFiles.length > 0) {
+      console.log(`Procesando ${anexoFiles.length} anexos del step 2...`)
+      
+      for (let i = 0; i < anexoFiles.length; i++) {
+        const anexo = anexoFiles[i]
+        try {
+          const anexoBuffer = Buffer.from(await anexo.arrayBuffer())
+          
+          // Generar nombre de archivo único
+          const timestamp = Date.now()
+          const fileExtension = anexo.name.split('.').pop() || ''
+          const fileName = `anexo_${i + 1}_${timestamp}.${fileExtension}`
+          
+          attachments.push({
+            filename: fileName,
+            content: anexoBuffer,
+            contentType: anexo.type || 'application/octet-stream'
+          })
+          
+          console.log(`Anexo ${i + 1} procesado: ${anexo.name} -> ${fileName}`)
+        } catch (error) {
+          console.error(`Error procesando anexo ${anexo.name}:`, error)
+          // Continuar con los demás anexos aunque uno falle
+        }
+      }
     }
     
     console.log(`Total de anexos preparados: ${attachments.length}`)
@@ -239,7 +273,12 @@ export async function POST(request: NextRequest) {
       success: true, 
       message: 'Correo enviado exitosamente',
       messageId: info.messageId,
-      recipients: emailRecipients.length
+      recipients: emailRecipients.length,
+      attachments: {
+        documento: 1,
+        anexos: anexoFiles.length,
+        total: 1 + anexoFiles.length
+      }
     }
     console.log('Respuesta exitosa:', successResponse)
     

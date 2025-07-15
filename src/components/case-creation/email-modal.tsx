@@ -219,7 +219,10 @@ Santiago de Cali - Colombia`)
           {/* Información del adjunto */}
           <div className="bg-blue-50 p-3 rounded-md">
             <p className="text-sm text-blue-800">
-              <strong>Adjunto:</strong> Se incluirá automáticamente el documento Word de la reclamación por responsabilidad civil extracontractual con toda la información del caso.
+              <strong>Documento Principal:</strong> Se incluirá automáticamente el documento Word de la reclamación por responsabilidad civil extracontractual con toda la información del caso.
+            </p>
+            <p className="text-xs text-blue-600 mt-1">
+              <strong>Anexos:</strong> Los anexos del step 2 (imágenes, documentos) se incluirán como archivos adjuntos separados en el correo.
             </p>
             <p className="text-xs text-blue-600 mt-1">
               <strong>Logo:</strong> El logo de BTL Legal Group (PNG) se incluirá automáticamente en el pie del mensaje.
