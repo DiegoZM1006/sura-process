@@ -304,6 +304,10 @@ const generateFormDataContent = (formData, caseType = "") => {
   if (!formData || Object.values(formData).every(value => !value || !value.toString().trim())) {
     // Si no hay datos del formulario pero sí hay tipo de caso, mostrar solo el título
     if (caseType) {
+      // Si es RCE de daños, mostrar la plantilla específica
+      if (caseType === "RECLAMACION RCE DAÑOS") {
+        return generateRCEDañosTemplate(formData, caseType);
+      }
       return `
 <h1>📋 ${caseType}</h1>
 
@@ -322,25 +326,38 @@ const generateFormDataContent = (formData, caseType = "") => {
   };
 
   // Función helper para formatear fecha
-  const formatDate = (dateValue) => {
-    if (!dateValue) return 'No especificada';
+  const formatDateFromDayMonthYear = (day, month, year) => {
+    if (!day || !month || !year) return 'No especificada';
     try {
-      const date = new Date(dateValue);
-      return date.toLocaleDateString('es-ES', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      });
+      const monthMap = {
+        'enero': 0, 'febrero': 1, 'marzo': 2, 'abril': 3, 'mayo': 4, 'junio': 5,
+        'julio': 6, 'agosto': 7, 'septiembre': 8, 'octubre': 9, 'noviembre': 10, 'diciembre': 11
+      };
+      const monthIndex = monthMap[month.toLowerCase()];
+      if (monthIndex !== undefined) {
+        const date = new Date(parseInt(year), monthIndex, parseInt(day));
+        return date.toLocaleDateString('es-ES', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        });
+      }
+      return `${day} de ${month} del ${year}`;
     } catch {
-      return dateValue;
+      return `${day} de ${month} del ${year}`;
     }
   };
+
+  // Si es RCE de daños, usar la plantilla específica
+  if (caseType === "RECLAMACION RCE DAÑOS") {
+    return generateRCEDañosTemplate(formData, caseType);
+  }
 
   // Usar el tipo de caso como título principal, o un título genérico si no hay tipo
   const title = caseType ? `📋 ${caseType}` : '📋 Información del Caso';
 
   // Obtener la ciudad y la fecha formateada en español
-  const ciudad = formatValue(formData.ciudadSucedido);
+  const ciudad = formatValue(formData.ciudad);
   const fechaActual = new Date();
   const fechaFormateada = fechaActual.toLocaleDateString('es-ES', {
     day: '2-digit',
@@ -353,43 +370,43 @@ const generateFormDataContent = (formData, caseType = "") => {
 
 <h2>🏢 Datos del Asegurado</h2>
 <ul>
-  <li><strong>Nombre o Razón Social:</strong> ${formatValue(formData.nombreRazonSocial)}</li>
-  <li><strong>NIT:</strong> ${formatValue(formData.nit)}</li>
-  <li><strong>Correo:</strong> ${formatValue(formData.correo)}</li>
-  <li><strong>Número de Póliza:</strong> ${formatValue(formData.polizaAsegurado)}</li>
+  <li><strong>Nombre de la Empresa:</strong> ${formatValue(formData.nombreEmpresa)}</li>
+  <li><strong>NIT:</strong> ${formatValue(formData.nitEmpresa)}</li>
+  <li><strong>Correo:</strong> ${formatValue(formData.correoEmpresa)}</li>
+  <li><strong>Número de Póliza Sura:</strong> ${formatValue(formData.numeroPolizaSura)}</li>
 </ul>
 
 <h2>🚗 Información del Accidente</h2>
 <ul>
-  <li><strong>Fecha del Accidente:</strong> ${formatDate(formData.fechaAccidente)}</li>
-  <li><strong>Dirección:</strong> ${formatValue(formData.direccionSucedido)}</li>
-  <li><strong>Ciudad:</strong> ${formatValue(formData.ciudadSucedido)}</li>
-  <li><strong>Departamento:</strong> ${formatValue(formData.departamentoSucedido)}</li>
+  <li><strong>Fecha del Accidente:</strong> ${formatDateFromDayMonthYear(formData.diaAccidente, formData.mesAccidente, formData.añoAccidente)}</li>
+  <li><strong>Dirección:</strong> ${formatValue(formData.direccionAccidente)}</li>
+  <li><strong>Ciudad:</strong> ${formatValue(formData.ciudad)}</li>
+  <li><strong>Departamento:</strong> ${formatValue(formData.departamento)}</li>
 </ul>
 
 <h2>🚙 Vehículos Involucrados</h2>
 
 <h3>Primer Vehículo</h3>
 <ul>
-  <li><strong>Placas:</strong> ${formatValue(formData.placas1erImplicado)}</li>
-  <li><strong>Propietario:</strong> ${formatValue(formData.propietario1erVehiculo)}</li>
+  <li><strong>Placas:</strong> ${formatValue(formData.placasPrimerVehiculo)}</li>
+  <li><strong>Propietario:</strong> ${formatValue(formData.propietarioPrimerVehiculo)}</li>
 </ul>
 
 <h3>Segundo Vehículo</h3>
 <ul>
-  <li><strong>Placas:</strong> ${formatValue(formData.placas2doImplicado)}</li>
-  <li><strong>Propietario:</strong> ${formatValue(formData.propietario2doVehiculo)}</li>
+  <li><strong>Placas:</strong> ${formatValue(formData.placasSegundoVehiculo)}</li>
+  <li><strong>Propietario:</strong> ${formatValue(formData.propietarioSegundoVehiculo)}</li>
 </ul>
 
-<h2>👤 Información del Conductor</h2>
+<h2>👤 Información del Conductor Infractor</h2>
 <ul>
-  <li><strong>Nombre:</strong> ${formatValue(formData.conductorVehiculo)}</li>
-  <li><strong>Cédula:</strong> ${formatValue(formData.ccConductor)}</li>
+  <li><strong>Nombre:</strong> ${formatValue(formData.conductorVehiculoInfractor)}</li>
+  <li><strong>Cédula:</strong> ${formatValue(formData.cedulaConductorInfractor)}</li>
 </ul>
 
 <h2>💰 Información Económica</h2>
 <ul>
-  <li><strong>Cuantías Estimadas:</strong> ${formatValue(formData.cuantias)}</li>
+  <li><strong>Cuantía (Total de daños):</strong> ${formatValue(formData.cuantia)}</li>
 </ul>
 
 <hr>
@@ -400,12 +417,173 @@ const generateFormDataContent = (formData, caseType = "") => {
 
 <h2>📝 Descripción Adicional</h2>
 <p>Aquí puedes agregar detalles adicionales sobre el caso, descripción de los daños, circunstancias del accidente, testigos, etc.</p>
+
+${formData.anexos && formData.anexos.length > 0 ? `
+<h2>📎 Anexos y Evidencias</h2>
+<p>Se han adjuntado ${formData.anexos.length} archivo${formData.anexos.length > 1 ? 's' : ''} como evidencia del caso:</p>
+<ul>
+${formData.anexos.map((file, index) => `  <li><strong>Anexo ${index + 1}:</strong> ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)</li>`).join('\n')}
+</ul>
+<p><em>Nota: Los anexos se incluirán en el documento final generado.</em></p>
+` : ''}
+  `;
+};
+
+// Función para generar la plantilla específica de RCE de daños
+const generateRCEDañosTemplate = (formData, caseType) => {
+  // Función helper para formatear valores
+  const formatValue = (value, defaultText = 'XXXXXXX') => {
+    return value && value.toString().trim() ? value.toString().trim() : defaultText;
+  };
+
+  // Función helper para formatear fecha en formato español completo desde día, mes y año
+  const formatDateFromDayMonthYear = (day, month, year) => {
+    if (!day || !month || !year) return 'XXX de XXXX del 2024';
+    try {
+      const dayNum = parseInt(day);
+      const monthStr = month.toLowerCase();
+      const yearNum = parseInt(year);
+      return `${dayNum} de ${monthStr} del ${yearNum}`;
+    } catch {
+      return 'XXX de XXXX del XXXX';
+    }
+  };
+
+  // Obtener fecha actual formateada
+  const fechaActual = new Date();
+  const monthNames = [
+    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+  ];
+  const fechaHoy = `${fechaActual.getDate()} de ${monthNames[fechaActual.getMonth()]} del ${fechaActual.getFullYear()}`;
+
+  return `
+<div style="text-align: center; margin-bottom: 40px;">
+  <img src="/btl-logo.svg" alt="BTL Legal Group" style="max-width: 200px; height: auto;" />
+</div>
+
+<div style="margin-bottom: 40px;">
+  <p style="text-align: right;">Santiago de Cali, ${formatValue(formData.diaActual, fechaActual.getDate().toString())} de ${formatValue(formData.mesActual, monthNames[fechaActual.getMonth()])} del ${formatValue(formData.añoActual, fechaActual.getFullYear().toString())}</p>
+</div>
+
+<div style="margin-bottom: 30px;">
+  <p><strong>Señores:</strong><br />
+  ${formatValue(formData.nombreEmpresa, 'XXXXXXXXXXXXXXX')}<br />
+  <strong>NIT.</strong> ${formatValue(formData.nitEmpresa, 'XXXXXXXXXXXXXXX')}<br />
+  <strong>CORREO</strong> ${formatValue(formData.correoEmpresa, 'XXXXXXXXXXXXXXX')}<br />
+  Bogotá D.C.</p>
+</div>
+
+<div style="text-align: center; margin: 30px 0;">
+  <p><strong>Asunto: Reclamación Responsabilidad Civil Extracontractual</strong></p>
+</div>
+
+<div style="text-align: justify; margin-bottom: 30px;">
+  <p><strong>JORGE ARMANDO LASSO DUQUE</strong>, identificado como aparece al pie de mi firma, obrando en calidad de Representante Legal General de la compañía <strong>SEGUROS GENERALES SURA S.A.</strong>, de conformidad con el poder otorgado mediante Escritura Pública No. 392 del 12 de abril de 2016, Clausula Primera, Numeral (5), presento <strong>RECLAMACIÓN FORMAL</strong> por el pago de perjuicios, con fundamento en los siguientes:</p>
+</div>
+
+<h2><strong>HECHOS</strong></h2>
+
+<div style="text-align: justify; margin-bottom: 30px;">
+  <p><strong>1.</strong> El ${formatDateFromDayMonthYear(formData.diaAccidente, formData.mesAccidente, formData.añoAccidente)} en la ${formatValue(formData.direccionAccidente, 'XXXXXXXXXXXXXXX')}, de la ciudad de ${formatValue(formData.ciudad, 'XXXXX XXXX')}, ${formatValue(formData.departamento, 'XXXXXXXX')}; se presentó un accidente de tránsito entre el vehículo de placas ${formatValue(formData.placasPrimerVehiculo, 'XXXXX')} de propiedad de ${formatValue(formData.propietarioPrimerVehiculo, 'XXXXXXXX')} y el vehículo de placas ${formatValue(formData.placasSegundoVehiculo, 'XXXXXX')} de propiedad de ${formatValue(formData.propietarioSegundoVehiculo, 'XXXXXXXX')} conducido por ${formatValue(formData.conductorVehiculoInfractor, 'RXXXXXXX')} identificado con cédula de ciudadanía ${formatValue(formData.cedulaConductorInfractor, '1XXXXXXXX')}</p>
+
+  <p><strong>2.</strong> Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${formatValue(formData.placasSegundoVehiculo, 'XXXXXXX')}</p>
+
+  <p><strong>3.</strong> El vehículo de placas ${formatValue(formData.placasPrimerVehiculo, 'XXXXXX')} se encontraba asegurado al momento del accidente por la póliza de seguros ${formatValue(formData.numeroPolizaSura, 'XXXXXXXXXX')} expedida por Seguros Generales Suramericana.</p>
+
+  <p><strong>4.</strong> Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de ${formatValue(formData.cuantia, 'XXXXXXXX')} por concepto de reparación de los daños materiales sufridos al vehículo de placas ${formatValue(formData.placasPrimerVehiculo, 'XXXXXXX')}.</p>
+</div>
+
+<div style="text-align: justify; margin-bottom: 30px;">
+  <p>Con fundamento en lo anterior, nos permitimos realizar la siguiente:</p>
+</div>
+
+<h2><strong>SOLICITUD</strong></h2>
+
+<div style="text-align: justify; margin-bottom: 40px;">
+  <p>De manera respetuosa solicitamos que ${formatValue(formData.nombreEmpresa, 'XXXXXXXXX')} cancele a favor de Seguros Generales Sura S.A. la suma de ${formatValue(formData.cuantia, 'XXXXXXXX')} en virtud de la subrogación consignada en el artículo 1096 del Código de Comercio.</p>
+</div>
+
+<h2><strong>FUNDAMENTOS DE DERECHO</strong></h2>
+
+<h3><strong>La subrogación</strong></h3>
+
+<div style="text-align: justify; margin-bottom: 20px;">
+  <p>Las entidades aseguradoras se ven obligadas al pago de las indemnizaciones que hayan sido pactadas en el contrato de seguro. No obstante, el Código de Comercio establece la posibilidad que asiste a la aseguradora de realizar el recobro de este pago a quien haya sido responsable del daño resarcido: "El asegurador que pague una indemnización se subrogará, por ministerio de la ley y hasta concurrencia de su importe, en los derechos del asegurado contra las personas responsables del siniestro."</p>
+
+  <p>La Corte Suprema de Justicia ha desarrollado esta disposición legal de la siguiente manera:</p>
+  
+  <p><em>La citada disposición permite establecer, que para el buen suceso de la «acción subrogatoria», se debe acreditar que en virtud de un «contrato de seguro», al haberse producido el «siniestro», el asegurador efectuó válidamente el «pago de la indemnización», de tal manera que por mandato legal se subroga en los derechos del afectado patrimonialmente con el riesgo amparado, pasando a ocupar su lugar o posición en la relación jurídica existente con el responsable o causante del hecho dañoso.</em></p>
+  
+  <p>En consecuencia, a Seguros Generales Sura S.A. le asiste el derecho a recobrar el valor pagado por la reparación del vehículo asegurado, en virtud de la figura de la subrogación, tanto frente al propietario como frente a la empresa de servicio público por cumplirse los presupuestos jurisprudenciales:</p>
+
+  <p><strong>a.</strong> Existe un contrato de seguro de autos soportado mediante la póliza ${formatValue(formData.numeroPolizaSura, 'XXXXXXXXXX')}.<br />
+  <strong>b.</strong> Se produjo un accidente de tránsito entre el vehículo de placa ${formatValue(formData.placasPrimerVehiculo, 'XXXXXXX')} y el vehículo de placa ${formatValue(formData.placasSegundoVehiculo, 'XXXXXXX')}, en el cual ha sido atribuida la responsabilidad al vehículo de su propiedad.<br />
+  <strong>c.</strong> Seguros Generales Sura S.A. canceló el valor de la reparación del vehículo de placas ${formatValue(formData.placasPrimerVehiculo, 'XXXXXX')}.</p>
+</div>
+
+<h3><strong>Responsabilidad Civil Extracontractual por Actividades Peligrosas</strong></h3>
+
+<div style="text-align: justify; margin-bottom: 20px;">
+  <p>El artículo 2341 del Código Civil establece que quien cometa un delito o culpa, y con ello le genere un daño a otro, se encuentra obligado a indemnizarlo, sin perjuicio de la pena principal que la ley imponga por la culpa o el delito cometido.</p>
+  
+  <p>En lo que respecta puntualmente a la responsabilidad civil extracontractual por actividades peligrosas, esta se origina en el ejercicio de una actividad que genera un riesgo mayor al que normalmente están expuestas las personas. Al respecto, la jurisprudencia de la Sala Civil de la Corte Suprema de Justicia ha definido en forma pacífica que la conducción de vehículos automotores es una actividad considerada como peligrosa. Lo anterior, debido al alto nivel de riesgo que implica su ejercicio.</p>
+  
+  <p>Ahora bien, en concordancia con el desarrollo jurisprudencial colombiano, con base en artículos como el 2356 (presunción de culpa en actividades peligrosas), 2347 y 2349 del Código civil (Responsabilidad indirecta por el hecho de empleado o personas a cargo) se establece todo un régimen de responsabilidad aplicado no solo a la persona principal que ejerce el hecho dañoso sino a terceros que tienen un deber de guarda o dominio y son solidariamente responsables en casos específicos.</p>
+  
+  <p>De esta forma, La Corte Suprema de Justicia, en la Sentencia del 13 de marzo de 2008 (Exp. 9327), reafirmó que la responsabilidad en casos de actividades peligrosas, recae sobre quien ostenta la condición de guardián, es decir, quien detenta el poder de mando, dirección y control sobre la actividad en el momento en que ocurre el daño.</p>
+  
+  <p>Asimismo, según la doctrina establecida en la Sentencia del 22 de abril de 1997 (Exp. 5743), la responsabilidad no se desplaza automáticamente con la venta del vehículo o la externalización de la actividad, si la empresa continúa obteniendo un beneficio económico de la misma. Ahora bien pese a no ser la propietaria directa del vehículo involucrado en el siniestro o la actividad principal de la empresa no sea el transporte, mantiene un claro vínculo económico con la actividad que generó el daño, toda vez que, asi la entidad no tenga como actividad principal el transporte, utiliza vehículos en sus operaciones y sigue obteniendo beneficios de esta actividad, generando así la actividad peligrosa. Este vínculo económico no la exime de responsabilidad, ya que, conforme a la doctrina expuesta por la Corte Suprema, la simple transferencia de la propiedad o la tercerización de la actividad no desplaza automáticamente la responsabilidad civil, si la empresa responsable sigue beneficiándose de la operación que ocasionó el perjuicio.</p>
+  
+  <p>En conclusión, en el contexto de la responsabilidad civil extracontractual en Colombia, tanto la jurisprudencia de la Corte Suprema como la normativa vigente establecen que la responsabilidad por daños en actividades peligrosas recae sobre quienes detentan el control, dirección y obtienen un beneficio económico de la actividad, independientemente de la propiedad directa de los bienes involucrados. Las empresas que conservan influencia y provecho económico en actividades riesgosas, como la operación de vehículos pueden ser solidariamente responsables por los daños causados, debiendo responder por ellos.</p>
+</div>
+
+<h3><strong>La responsabilidad de la empresa de transportes</strong></h3>
+
+<div style="text-align: justify; margin-bottom: 30px;">
+  <p>La afiliación de vehículos automotores a una empresa prestadora del servicio público de transporte conlleva una serie de responsabilidades de carácter legal, establecidas en la Ley 336 de 1996. El artículo 36 de esta norma establece: "Los conductores de los equipos destinados al servicio público de transporte serán contratados directamente por la empresa operadora de transporte, quien para todos los efectos será solidariamente responsable junto con el propietario del equipo."</p>
+
+  <p>La responsabilidad solidaria planteada en estos términos implica que la empresa de transporte deberá responder por los créditos en cabeza de cualquiera de sus conductores, derivados de la ejecución de la actividad de transporte. Por lo tanto, este fundamento legal activa la posibilidad de efectuar el cobro directo a la empresa de transporte cuando los perjuicios ocasionados a un tercero sean producto de la responsabilidad de uno de sus vehículos afiliados. Por lo tanto, solicitamos de manera respetuosa que se acojan a nuestras pretensiones.</p>
+</div>
+
+<h2><strong>NOTIFICACIONES</strong></h2>
+
+<h3><strong>Invitación a llegar a un acuerdo.</strong></h3>
+
+<div style="text-align: justify; margin-bottom: 30px;">
+  <p>Es interés de Seguros Generales Suramericana S.A. poder invitarlo a que podamos materializar un acuerdo beneficioso para ambas partes que evite desgastes administrativos y judiciales para ambas partes, por lo anterior en caso de que resulte de su interés poder que realicemos acercamientos al respecto, nos permitimos informarle que el recobro del presente siniestro ha sido asignado a la firma de abogados externos BTL Legal Group S.A.S. ubicada en la Avenida 6AN 25N – 22 Piso Tercero, Cali - Valle del Cauca y con números de teléfonos 6686611, , WhatsApp 323 6214498 y correo electrónico subrogacion10@btllegalgroup.com. Empresa con la cual podrá comunicarse en caso de que resulte de su interés poder llegar a un acuerdo para zanjar la presente controversia.</p>
+</div>
+
+<h2><strong>ANEXOS</strong></h2>
+
+<div style="margin-bottom: 30px;">
+  <p><strong>1.</strong> Aviso de siniestro de póliza ${formatValue(formData.numeroPolizaSura, 'XXXXXXXXXXX')} expedida por Seguros Generales Sura S.A.</p>
+  <p><strong>2.</strong> Registro fotográfico dispuesto en el Artículo 16 de la Ley 2251 del 2022 / IPAT.</p>
+  <p><strong>3.</strong> Constancia de pago de daños materiales del vehículo asegurado por Sura S.A.</p>
+  <p><strong>4.</strong> Copia simple de la Escritura Pública No. 392 del 12 de abril de 2016, a través del cual se otorga la representación legal general al suscrito.</p>
+</div>
+
+<div style="margin-top: 60px; text-align: center;">
+  <p>Atentamente,</p>
+  
+  <div style="margin: 40px 0;">
+    <img src="/firma.png" alt="Firma Jorge Armando Lasso Duque" style="max-width: 200px; height: auto;" />
+  </div>
+  
+  <p><strong>JORGE ARMANDO LASSO DUQUE</strong><br />
+  C.C. 1.130.638.193</p>
+</div>
+
+<div style="margin-top: 60px; border-top: 1px solid #ccc; padding-top: 20px; text-align: center;">
+  <p><em>Información de contacto BTL Legal Group</em></p>
+</div>
   `;
 };
 
 const StyledEditor = ({ formData = {}, caseType = "" }) => {
   const [forceRegenerate, setForceRegenerate] = useState(0);
   const editorContent = generateFormDataContent(formData, caseType);
+  const editorRef = useRef(null);
   
   const handleRegenerateContent = () => {
     // Forzar regeneración del contenido incrementando el contador
@@ -413,7 +591,7 @@ const StyledEditor = ({ formData = {}, caseType = "" }) => {
   };
   
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full h-full flex flex-col" ref={editorRef}>
       <style>{editorStyles}</style>
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-y-scroll flex flex-col h-full">
         <EditorProvider 

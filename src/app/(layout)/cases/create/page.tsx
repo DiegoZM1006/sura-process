@@ -25,21 +25,24 @@ export default function CreateCasePage() {
         { id: 3, name: "Revisión", status: "upcoming" },
     ])
     const [formData, setFormData] = useState({
-        nombreRazonSocial: "",
-        nit: "",
-        correo: "",
-        fechaAccidente: "",
-        direccionSucedido: "",
-        ciudadSucedido: "",
-        departamentoSucedido: "",
-        placas1erImplicado: "",
-        propietario1erVehiculo: "",
-        placas2doImplicado: "",
-        propietario2doVehiculo: "",
-        conductorVehiculo: "",
-        ccConductor: "",
-        cuantias: "",
-        polizaAsegurado: "",
+        nombreEmpresa: "",
+        nitEmpresa: "",
+        correoEmpresa: "",
+        diaAccidente: "",
+        mesAccidente: "",
+        añoAccidente: "",
+        direccionAccidente: "",
+        ciudad: "",
+        departamento: "",
+        placasPrimerVehiculo: "",
+        propietarioPrimerVehiculo: "",
+        placasSegundoVehiculo: "",
+        propietarioSegundoVehiculo: "",
+        conductorVehiculoInfractor: "",
+        cedulaConductorInfractor: "",
+        numeroPolizaSura: "",
+        cuantia: "",
+        anexos: [] as File[], // Añadir anexos persistentes
     })
 
     // Obtener el tipo de caso de los parámetros de búsqueda
@@ -98,8 +101,10 @@ export default function CreateCasePage() {
     }
 
     const handleFinish = () => {
-        console.log('Finalizar caso:', formData)
-        // Aquí iría la lógica para crear el caso
+        console.log('Caso finalizado exitosamente:', formData)
+        // Aquí iría la lógica para guardar el caso en la base de datos
+        // Por ejemplo, redirigir a la lista de casos
+        alert('Caso creado y enviado exitosamente!')
     }
 
     const renderStepContent = () => {
@@ -118,10 +123,10 @@ export default function CreateCasePage() {
             case 2:
                 return (
                     <StepTwo
+                        formData={formData}
+                        updateFormData={setFormData}
                         onNext={nextStep}
                         onPrev={prevStep}
-                        currentStep={currentStep}
-                        isStepComplete={() => true} // Siempre true para testing
                     />
                 )
             case 3:
@@ -130,6 +135,8 @@ export default function CreateCasePage() {
                         onPrev={prevStep}
                         onFinish={handleFinish}
                         currentStep={currentStep}
+                        caseType={caseType}
+                        formData={formData}
                     />
                 )
             default:
@@ -187,26 +194,39 @@ export default function CreateCasePage() {
 
             {/* Contenido Principal */}
             <div className="flex-1 flex p-4 gap-6">
-                {/* Formulario/Contenido del paso - 1/3 del ancho */}
-                <div className="w-1/3">
-                    {renderStepContent()}
-                </div>
-
-                {/* Editor - 2/3 del ancho */}
-                <div className="w-2/3">
-                    <div className="h-[calc(100vh-100px)] sticky top-6 overflow-hidden flex flex-col">
-                        <div className="flex-1 overflow-hidden">
-                            <TiptapEditor formData={formData} caseType={caseType} />
-                        </div>
-                        <EditorFooter
-                            currentStep={currentStep}
-                            totalSteps={steps.length}
-                            onNext={nextStep}
-                            onPrev={currentStep > 1 ? prevStep : undefined}
-                            onFinish={currentStep === steps.length ? handleFinish : undefined}
-                        />
+                {currentStep === 3 ? (
+                    /* Step 3 - Editor a pantalla completa */
+                    <div className="w-full">
+                        {renderStepContent()}
                     </div>
-                </div>
+                ) : (
+                    /* Steps 1 y 2 - Layout dividido */
+                    <>
+                        {/* Formulario/Contenido del paso - 1/3 del ancho */}
+                        <div className="w-1/3">
+                            {renderStepContent()}
+                        </div>
+
+                        {/* Editor - 2/3 del ancho */}
+                        <div className="w-2/3">
+                            <div className="h-[calc(100vh-100px)] sticky top-6 overflow-hidden flex flex-col">
+                                <div className="flex-1 overflow-hidden">
+                                    <TiptapEditor 
+                                        formData={formData} 
+                                        caseType={caseType}
+                                    />
+                                </div>
+                                <EditorFooter
+                                    currentStep={currentStep}
+                                    totalSteps={steps.length}
+                                    onNext={nextStep}
+                                    onPrev={currentStep > 1 ? prevStep : undefined}
+                                    onFinish={currentStep === steps.length ? handleFinish : undefined}
+                                />
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     )

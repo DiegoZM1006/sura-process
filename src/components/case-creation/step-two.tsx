@@ -1,86 +1,60 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState } from "react"
+import { Upload, X, FileText, Image, File } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { X, Upload, Image as ImageIcon } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface StepTwoProps {
+  formData: any
+  updateFormData: (data: any) => void
   onNext: () => void
   onPrev: () => void
-  currentStep: number
-  isStepComplete: () => boolean
 }
 
-interface UploadedImage {
-  id: string
-  file: File
-  url: string
-  name: string
-  size: number
-}
+export function StepTwo({ formData, updateFormData, onNext, onPrev }: StepTwoProps) {
+  const [dragActive, setDragActive] = useState(false)
 
-export function StepTwo({ onNext, onPrev, currentStep, isStepComplete }: StepTwoProps) {
-  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([])
-  const [isDragOver, setIsDragOver] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const handleImageUpload = (files: FileList | null) => {
+  const handleFiles = (files: FileList | null) => {
     if (!files) return
 
-    const validFiles = Array.from(files).filter(file => {
-      if (!file.type.startsWith('image/')) {
-        alert(`${file.name} no es una imagen válida`)
-        return false
-      }
-      if (file.size > 10 * 1024 * 1024) { // 10MB limit
-        alert(`${file.name} es demasiado grande. Máximo 10MB`)
-        return false
-      }
-      return true
+    const newFiles = Array.from(files).filter(file => {
+      // Filtrar tipos de archivo permitidos
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'image/webp']
+      return allowedTypes.includes(file.type) && file.size <= 10 * 1024 * 1024 // 10MB max
     })
 
-    validFiles.forEach(file => {
-      const id = Date.now() + Math.random().toString(36).substr(2, 9)
-      const url = URL.createObjectURL(file)
-      
-      const newImage: UploadedImage = {
-        id,
-        file,
-        url,
-        name: file.name,
-        size: file.size
-      }
-
-      setUploadedImages(prev => [...prev, newImage])
-    })
-  }
-
-  const removeImage = (id: string) => {
-    setUploadedImages(prev => {
-      const imageToRemove = prev.find(img => img.id === id)
-      if (imageToRemove) {
-        URL.revokeObjectURL(imageToRemove.url)
-      }
-      return prev.filter(img => img.id !== id)
-    })
-  }
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(true)
-  }
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(false)
+    const currentAnexos = formData.anexos || []
+    const updatedAnexos = [...currentAnexos, ...newFiles]
+    
+    updateFormData({ ...formData, anexos: updatedAnexos })
   }
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
-    setIsDragOver(false)
-    handleImageUpload(e.dataTransfer.files)
+    e.stopPropagation()
+    setDragActive(false)
+    handleFiles(e.dataTransfer.files)
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleFiles(e.target.files)
+  }
+
+  const removeFile = (index: number) => {
+    const currentAnexos = formData.anexos || []
+    const updatedAnexos = currentAnexos.filter((_: any, i: number) => i !== index)
+    updateFormData({ ...formData, anexos: updatedAnexos })
+  }
+
+  const getFileIcon = (file: File) => {
+    if (file.type.startsWith('image/')) {
+      return <Image className="w-8 h-8 text-blue-500" />
+    } else if (file.type === 'application/pdf') {
+      return <FileText className="w-8 h-8 text-red-500" />
+    } else {
+      return <File className="w-8 h-8 text-gray-500" />
+    }
   }
 
   const formatFileSize = (bytes: number) => {
@@ -91,130 +65,118 @@ export function StepTwo({ onNext, onPrev, currentStep, isStepComplete }: StepTwo
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  const isComplete = () => uploadedImages.length > 0
-
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Anexos - Subir Imágenes</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Zona de subida */}
-        <div className="space-y-4">
-          <Label className="text-sm font-medium">
-            Imágenes del caso <span className="text-red-500">*</span>
-          </Label>
-          
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="w-5 h-5" />
+            Anexos y Documentos de Soporte
+          </CardTitle>
+          <CardDescription>
+            Suba los documentos, imágenes y evidencias relacionadas con el caso. 
+            Formatos permitidos: JPG, PNG, GIF, PDF, WEBP (máximo 10MB por archivo)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Zona de arrastre y suelta */}
           <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              isDragOver
-                ? 'border-[#182A76] bg-blue-50'
+            className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              dragActive 
+                ? 'border-blue-500 bg-blue-50' 
                 : 'border-gray-300 hover:border-gray-400'
             }`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
+            onDragEnter={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setDragActive(true)
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setDragActive(false)
+            }}
+            onDragOver={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+            }}
             onDrop={handleDrop}
           >
-            <div className="flex flex-col items-center space-y-4">
-              <div className="p-4 bg-gray-100 rounded-full">
-                <Upload className="h-8 w-8 text-gray-600" />
-              </div>
-              
-              <div className="space-y-2">
-                <p className="text-lg font-medium text-gray-900">
-                  Arrastra y suelta tus imágenes aquí
-                </p>
-                <p className="text-sm text-gray-500">
-                  o haz clic para seleccionar archivos
-                </p>
-              </div>
-              
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                className="mt-4"
-              >
-                <ImageIcon className="h-4 w-4 mr-2" />
-                Seleccionar Imágenes
-              </Button>
-              
-              <p className="text-xs text-gray-400">
-                Formatos soportados: JPG, PNG, GIF, WebP (máx. 10MB por imagen)
-              </p>
-            </div>
+            <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-lg font-medium text-gray-700 mb-2">
+              Arrastra archivos aquí o haz clic para seleccionar
+            </p>
+            <p className="text-sm text-gray-500 mb-4">
+              JPG, PNG, GIF, PDF, WEBP hasta 10MB
+            </p>
+            <input
+              type="file"
+              multiple
+              accept="image/*,.pdf"
+              onChange={handleInputChange}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+            <Button variant="outline" className="pointer-events-none">
+              Seleccionar Archivos
+            </Button>
           </div>
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={(e) => handleImageUpload(e.target.files)}
-            className="hidden"
-          />
-        </div>
-
-        {/* Lista de imágenes subidas */}
-        {uploadedImages.length > 0 && (
-          <div className="space-y-4">
-            <Label className="text-sm font-medium">
-              Imágenes cargadas ({uploadedImages.length})
-            </Label>
-            
-            <div className="grid grid-cols-2 gap-4">
-              {uploadedImages.map((image) => (
-                <div
-                  key={image.id}
-                  className="relative group border rounded-lg overflow-hidden bg-gray-50"
-                >
-                  <div className="aspect-video relative">
-                    <img
-                      src={image.url}
-                      alt={image.name}
-                      className="w-full h-full object-cover"
-                    />
-                    
-                    <button
-                      onClick={() => removeImage(image.id)}
-                      className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+          {/* Lista de archivos subidos */}
+          {formData.anexos && formData.anexos.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-lg font-medium mb-4">
+                Archivos Adjuntos ({formData.anexos.length})
+              </h3>
+              <div className="space-y-3">
+                {formData.anexos.map((file: File, index: number) => (
+                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
+                    <div className="flex items-center gap-3">
+                      {getFileIcon(file)}
+                      <div>
+                        <p className="font-medium text-gray-900">{file.name}</p>
+                        <p className="text-sm text-gray-500">
+                          {formatFileSize(file.size)} • {file.type}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeFile(index)}
+                      className="text-red-600 hover:text-red-800 hover:bg-red-50"
                     >
-                      <X className="h-4 w-4" />
-                    </button>
+                      <X className="w-4 h-4" />
+                    </Button>
                   </div>
-                  
-                  <div className="p-3">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {image.name}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {formatFileSize(image.size)}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Botones de navegación */}
-        <div className="pt-4 flex gap-2">
-          <Button
-            variant="outline"
-            onClick={onPrev}
-            className="flex-1"
-          >
-            Anterior
-          </Button>
-          <Button
-            onClick={onNext}
-            disabled={false} // Remover validación para testing
-            className="flex-1 bg-[#182A76] hover:bg-[#182A76]/90"
-          >
-            Guardar
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+          {/* Información adicional */}
+          <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <h4 className="font-medium text-blue-900 mb-2">💡 Tipos de documentos recomendados:</h4>
+            <ul className="text-sm text-blue-800 space-y-1">
+              <li>• Fotografías del accidente y daños</li>
+              <li>• Informe policial o IPAT</li>
+              <li>• Cotizaciones y facturas de reparación</li>
+              <li>• Documentos del vehículo (tarjeta de propiedad, SOAT)</li>
+              <li>• Declaraciones de testigos</li>
+              <li>• Cualquier evidencia adicional relevante</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Botones de navegación */}
+      <div className="flex justify-between pt-6">
+        <Button variant="outline" onClick={onPrev}>
+          Anterior
+        </Button>
+        <Button onClick={onNext}>
+          Siguiente
+        </Button>
+      </div>
+    </div>
   )
 }

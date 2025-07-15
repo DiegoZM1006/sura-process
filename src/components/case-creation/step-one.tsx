@@ -9,21 +9,23 @@ import { SaveIcon } from "lucide-react"
 
 interface StepOneProps {
   formData: {
-    nombreRazonSocial: string
-    nit: string
-    correo: string
-    fechaAccidente: string
-    direccionSucedido: string
-    ciudadSucedido: string
-    departamentoSucedido: string
-    placas1erImplicado: string
-    propietario1erVehiculo: string
-    placas2doImplicado: string
-    propietario2doVehiculo: string
-    conductorVehiculo: string
-    ccConductor: string
-    cuantias: string
-    polizaAsegurado: string
+    nombreEmpresa: string
+    nitEmpresa: string
+    correoEmpresa: string
+    diaAccidente: string
+    mesAccidente: string
+    añoAccidente: string
+    direccionAccidente: string
+    ciudad: string
+    departamento: string
+    placasPrimerVehiculo: string
+    propietarioPrimerVehiculo: string
+    placasSegundoVehiculo: string
+    propietarioSegundoVehiculo: string
+    conductorVehiculoInfractor: string
+    cedulaConductorInfractor: string
+    numeroPolizaSura: string
+    cuantia: string
   }
   handleInputChange: (field: string, value: string) => void
   onNext: () => void
@@ -46,206 +48,304 @@ export function StepOne({
         <CardTitle>Campos Requeridos</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-2">
-          <Label htmlFor="nombreRazonSocial">
-            Nombre o Razón Social <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="nombreRazonSocial"
-            value={formData.nombreRazonSocial}
-            onChange={(e) => handleInputChange('nombreRazonSocial', e.target.value)}
-            placeholder="Ingrese nombre o razón social"
-            required
-          />
+        {/* Información de la Empresa */}
+        <div className="space-y-4">
+          <h3 className="text-md font-semibold text-gray-900">Información de la Empresa</h3>
+          
+          <div className="grid gap-2">
+            <Label htmlFor="nombreEmpresa">
+              1. Nombre Empresa <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="nombreEmpresa"
+              value={formData.nombreEmpresa}
+              onChange={(e) => handleInputChange('nombreEmpresa', e.target.value)}
+              placeholder="Ingrese nombre de la empresa"
+              required
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="nitEmpresa">
+              2. NIT Empresa <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="nitEmpresa"
+              value={formData.nitEmpresa}
+              onChange={(e) => handleInputChange('nitEmpresa', e.target.value)}
+              placeholder="Ingrese NIT de la empresa"
+              required
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="correoEmpresa">
+              3. Correo Empresa <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="correoEmpresa"
+              type="email"
+              value={formData.correoEmpresa}
+              onChange={(e) => handleInputChange('correoEmpresa', e.target.value)}
+              placeholder="Ingrese correo de la empresa"
+              required
+            />
+          </div>
         </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="nit">
-            NIT <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="nit"
-            value={formData.nit}
-            onChange={(e) => handleInputChange('nit', e.target.value)}
-            placeholder="Ingrese NIT"
-            required
-          />
+        {/* Información del Accidente */}
+        <div className="space-y-4">
+          <h3 className="text-md font-semibold text-gray-900">Información del Accidente</h3>
+          
+          <div className="grid grid-cols-3 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="diaAccidente">
+                4. Día del Accidente <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="diaAccidente"
+                type="number"
+                min="1"
+                max="31"
+                value={formData.diaAccidente}
+                onChange={(e) => handleInputChange('diaAccidente', e.target.value)}
+                placeholder="DD"
+                required
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="mesAccidente">
+                5. Mes del Accidente <span className="text-red-500">*</span>
+              </Label>
+              <Select value={formData.mesAccidente} onValueChange={(value) => handleInputChange('mesAccidente', value)} required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccione mes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="enero">Enero</SelectItem>
+                  <SelectItem value="febrero">Febrero</SelectItem>
+                  <SelectItem value="marzo">Marzo</SelectItem>
+                  <SelectItem value="abril">Abril</SelectItem>
+                  <SelectItem value="mayo">Mayo</SelectItem>
+                  <SelectItem value="junio">Junio</SelectItem>
+                  <SelectItem value="julio">Julio</SelectItem>
+                  <SelectItem value="agosto">Agosto</SelectItem>
+                  <SelectItem value="septiembre">Septiembre</SelectItem>
+                  <SelectItem value="octubre">Octubre</SelectItem>
+                  <SelectItem value="noviembre">Noviembre</SelectItem>
+                  <SelectItem value="diciembre">Diciembre</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="añoAccidente">
+                6. Año del Accidente <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="añoAccidente"
+                type="number"
+                min="2000"
+                max="2030"
+                value={formData.añoAccidente}
+                onChange={(e) => handleInputChange('añoAccidente', e.target.value)}
+                placeholder="YYYY"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="direccionAccidente">
+              7. Dirección del Accidente <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="direccionAccidente"
+              value={formData.direccionAccidente}
+              onChange={(e) => handleInputChange('direccionAccidente', e.target.value)}
+              placeholder="Ingrese dirección donde ocurrió el accidente"
+              required
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="ciudad">
+              8. Ciudad <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="ciudad"
+              value={formData.ciudad}
+              onChange={(e) => handleInputChange('ciudad', e.target.value)}
+              placeholder="Ingrese ciudad"
+              required
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="departamento">
+              9. Departamento <span className="text-red-500">*</span>
+            </Label>
+            <Select value={formData.departamento} onValueChange={(value) => handleInputChange('departamento', value)} required>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccione departamento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="amazonas">Amazonas</SelectItem>
+                <SelectItem value="antioquia">Antioquia</SelectItem>
+                <SelectItem value="arauca">Arauca</SelectItem>
+                <SelectItem value="atlantico">Atlántico</SelectItem>
+                <SelectItem value="bolivar">Bolívar</SelectItem>
+                <SelectItem value="boyaca">Boyacá</SelectItem>
+                <SelectItem value="caldas">Caldas</SelectItem>
+                <SelectItem value="caqueta">Caquetá</SelectItem>
+                <SelectItem value="casanare">Casanare</SelectItem>
+                <SelectItem value="cauca">Cauca</SelectItem>
+                <SelectItem value="cesar">Cesar</SelectItem>
+                <SelectItem value="choco">Chocó</SelectItem>
+                <SelectItem value="cordoba">Córdoba</SelectItem>
+                <SelectItem value="cundinamarca">Cundinamarca</SelectItem>
+                <SelectItem value="guainia">Guainía</SelectItem>
+                <SelectItem value="guaviare">Guaviare</SelectItem>
+                <SelectItem value="huila">Huila</SelectItem>
+                <SelectItem value="la-guajira">La Guajira</SelectItem>
+                <SelectItem value="magdalena">Magdalena</SelectItem>
+                <SelectItem value="meta">Meta</SelectItem>
+                <SelectItem value="narino">Nariño</SelectItem>
+                <SelectItem value="norte-de-santander">Norte de Santander</SelectItem>
+                <SelectItem value="putumayo">Putumayo</SelectItem>
+                <SelectItem value="quindio">Quindío</SelectItem>
+                <SelectItem value="risaralda">Risaralda</SelectItem>
+                <SelectItem value="san-andres">San Andrés y Providencia</SelectItem>
+                <SelectItem value="santander">Santander</SelectItem>
+                <SelectItem value="sucre">Sucre</SelectItem>
+                <SelectItem value="tolima">Tolima</SelectItem>
+                <SelectItem value="valle-del-cauca">Valle del Cauca</SelectItem>
+                <SelectItem value="vaupes">Vaupés</SelectItem>
+                <SelectItem value="vichada">Vichada</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="correo">
-            Correo <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="correo"
-            type="email"
-            value={formData.correo}
-            onChange={(e) => handleInputChange('correo', e.target.value)}
-            placeholder="Ingrese correo electrónico"
-            required
-          />
+        {/* Información de los Vehículos */}
+        <div className="space-y-4">
+          <h3 className="text-md font-semibold text-gray-900">Información de los Vehículos</h3>
+          
+          <div className="grid gap-2">
+            <Label htmlFor="placasPrimerVehiculo">
+              10. Placas Primer Vehículo <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="placasPrimerVehiculo"
+              value={formData.placasPrimerVehiculo}
+              onChange={(e) => handleInputChange('placasPrimerVehiculo', e.target.value)}
+              placeholder="ABC123"
+              required
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="propietarioPrimerVehiculo">
+              11. Propietario Primer Vehículo <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="propietarioPrimerVehiculo"
+              value={formData.propietarioPrimerVehiculo}
+              onChange={(e) => handleInputChange('propietarioPrimerVehiculo', e.target.value)}
+              placeholder="Nombre del propietario"
+              required
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="placasSegundoVehiculo">
+              12. Placas Segundo Vehículo <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="placasSegundoVehiculo"
+              value={formData.placasSegundoVehiculo}
+              onChange={(e) => handleInputChange('placasSegundoVehiculo', e.target.value)}
+              placeholder="XYZ789"
+              required
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="propietarioSegundoVehiculo">
+              13. Propietario Segundo Vehículo <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="propietarioSegundoVehiculo"
+              value={formData.propietarioSegundoVehiculo}
+              onChange={(e) => handleInputChange('propietarioSegundoVehiculo', e.target.value)}
+              placeholder="Nombre del propietario"
+              required
+            />
+          </div>
         </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="fechaAccidente">
-            Fecha Accidente <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="fechaAccidente"
-            type="date"
-            value={formData.fechaAccidente}
-            onChange={(e) => handleInputChange('fechaAccidente', e.target.value)}
-            required
-          />
+        {/* Información del Conductor Infractor */}
+        <div className="space-y-4">
+          <h3 className="text-md font-semibold text-gray-900">Información del Conductor Infractor</h3>
+          
+          <div className="grid gap-2">
+            <Label htmlFor="conductorVehiculoInfractor">
+              14. Conductor Vehículo Infractor <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="conductorVehiculoInfractor"
+              value={formData.conductorVehiculoInfractor}
+              onChange={(e) => handleInputChange('conductorVehiculoInfractor', e.target.value)}
+              placeholder="Nombre del conductor"
+              required
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="cedulaConductorInfractor">
+              15. Cédula del Conductor Infractor <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="cedulaConductorInfractor"
+              value={formData.cedulaConductorInfractor}
+              onChange={(e) => handleInputChange('cedulaConductorInfractor', e.target.value)}
+              placeholder="1234567890"
+              required
+            />
+          </div>
         </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="direccionSucedido">
-            Dirección de lo Sucedido <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="direccionSucedido"
-            value={formData.direccionSucedido}
-            onChange={(e) => handleInputChange('direccionSucedido', e.target.value)}
-            placeholder="Ingrese dirección del accidente"
-            required
-          />
-        </div>
+        {/* Información Económica y Póliza */}
+        <div className="space-y-4">
+          <h3 className="text-md font-semibold text-gray-900">Información Económica y Póliza</h3>
+          
+          <div className="grid gap-2">
+            <Label htmlFor="numeroPolizaSura">
+              16. Número de Póliza Sura <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="numeroPolizaSura"
+              value={formData.numeroPolizaSura}
+              onChange={(e) => handleInputChange('numeroPolizaSura', e.target.value)}
+              placeholder="Número de póliza"
+              required
+            />
+          </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="ciudadSucedido">
-            Ciudad de lo Sucedido <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="ciudadSucedido"
-            value={formData.ciudadSucedido}
-            onChange={(e) => handleInputChange('ciudadSucedido', e.target.value)}
-            placeholder="Ciudad"
-            required
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="departamentoSucedido">
-            Departamento <span className="text-red-500">*</span>
-          </Label>
-          <Select value={formData.departamentoSucedido} onValueChange={(value) => handleInputChange('departamentoSucedido', value)} required>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Seleccione departamento" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="antioquia">Antioquia</SelectItem>
-              <SelectItem value="bogota">Bogotá D.C.</SelectItem>
-              <SelectItem value="valle">Valle del Cauca</SelectItem>
-              <SelectItem value="cundinamarca">Cundinamarca</SelectItem>
-              <SelectItem value="atlantico">Atlántico</SelectItem>
-              <SelectItem value="santander">Santander</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="placas1erImplicado">
-            Placas 1er Implicado <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="placas1erImplicado"
-            value={formData.placas1erImplicado}
-            onChange={(e) => handleInputChange('placas1erImplicado', e.target.value)}
-            placeholder="ABC-123"
-            required
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="propietario1erVehiculo">
-            Propietario 1er Vehículo <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="propietario1erVehiculo"
-            value={formData.propietario1erVehiculo}
-            onChange={(e) => handleInputChange('propietario1erVehiculo', e.target.value)}
-            placeholder="Nombre"
-            required
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="placas2doImplicado">
-            Placas 2do Implicado <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="placas2doImplicado"
-            value={formData.placas2doImplicado}
-            onChange={(e) => handleInputChange('placas2doImplicado', e.target.value)}
-            placeholder="XYZ-456"
-            required
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="propietario2doVehiculo">
-            Propietario 2do Vehículo <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="propietario2doVehiculo"
-            value={formData.propietario2doVehiculo}
-            onChange={(e) => handleInputChange('propietario2doVehiculo', e.target.value)}
-            placeholder="Nombre"
-            required
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="conductorVehiculo">
-            Conductor Vehículo <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="conductorVehiculo"
-            value={formData.conductorVehiculo}
-            onChange={(e) => handleInputChange('conductorVehiculo', e.target.value)}
-            placeholder="Nombre del conductor"
-            required
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="ccConductor">
-            CC Conductor <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="ccConductor"
-            value={formData.ccConductor}
-            onChange={(e) => handleInputChange('ccConductor', e.target.value)}
-            placeholder="Cédula de ciudadanía"
-            required
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="cuantias">
-            Cuantías <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="cuantias"
-            value={formData.cuantias}
-            onChange={(e) => handleInputChange('cuantias', e.target.value)}
-            placeholder="Valor estimado de daños"
-            required
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="polizaAsegurado">
-            # Póliza del Asegurado <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="polizaAsegurado"
-            value={formData.polizaAsegurado}
-            onChange={(e) => handleInputChange('polizaAsegurado', e.target.value)}
-            placeholder="Número de póliza"
-            required
-          />
+          <div className="grid gap-2">
+            <Label htmlFor="cuantia">
+              17. Cuantía (Cantidad de dinero por todos los daños) <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="cuantia"
+              type="number"
+              value={formData.cuantia}
+              onChange={(e) => handleInputChange('cuantia', e.target.value)}
+              placeholder="$0"
+              required
+            />
+          </div>
         </div>
 
         <div className="pt-4 flex gap-2">
