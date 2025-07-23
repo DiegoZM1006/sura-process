@@ -38,6 +38,8 @@ interface FormData {
   nombreEmpresa: string
   nitEmpresa: string
   correoEmpresa: string
+  direccionEmpresa: string
+  telefonoEmpresa: string
   diaAccidente: string
   mesAccidente: string
   añoAccidente: string
@@ -154,8 +156,19 @@ const prepareTemplateData = async (formData: FormData) => {
     // Información de la empresa/destinatario (exactamente como en la plantilla)
     nombreEmpresa: formatValue(formData.nombreEmpresa, 'XXXXXXXXXXXXXXX'),
     nitEmpresa: formatValue(formData.nitEmpresa, 'XXXXXXXXXXXXXXX'),
-    correoEmpresa: formatValue(formData.correoEmpresa, 'XXXXXXXXXXXXXXX'),
-    
+    // correoEmpresa: Array.isArray(formData.correoEmpresa)
+    //   ? formData.correoEmpresa.join('\n')
+    //   : formatValue(formData.correoEmpresa, '{correoEmpresa}'),
+    direccionEmpresa: formatValue(formData.direccionEmpresa, '{direccionEmpresa}'),
+    telefonoEmpresa: formatValue(formData.telefonoEmpresa, '{telefonoEmpresa}'),
+
+    // Para loop de correos en docxtemplater
+    correos: Array.isArray(formData.correoEmpresa)
+      ? formData.correoEmpresa.filter((c: string) => !!c && c.trim()).map((c: string) => ({ correoEmpresa: c.trim() }))
+      : formData.correoEmpresa && formData.correoEmpresa.trim()
+        ? [{ correoEmpresa: formData.correoEmpresa.trim() }]
+        : [],
+        
     // Datos del accidente (exactamente como en la plantilla)
     diaAccidente: formatValue(formData.diaAccidente, 'XX'),
     mesAccidente: formatValue(formData.mesAccidente, 'XXXXXXX'),

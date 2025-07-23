@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { MultiEmailInput } from "./multi-email-input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SaveIcon } from "lucide-react"
@@ -11,7 +12,9 @@ interface StepOneProps {
   formData: {
     nombreEmpresa: string
     nitEmpresa: string
-    correoEmpresa: string
+    correoEmpresa: string | string[]
+    direccionEmpresa: string | string[]
+    telefonoEmpresa: string
     diaAccidente: string
     mesAccidente: string
     añoAccidente: string
@@ -27,7 +30,7 @@ interface StepOneProps {
     numeroPolizaSura: string
     cuantia: string
   }
-  handleInputChange: (field: string, value: string) => void
+  handleInputChange: (field: string, value: string | string[]) => void
   onNext: () => void
   onPrev?: () => void
   isStepComplete: () => boolean
@@ -79,15 +82,38 @@ export function StepOne({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="correoEmpresa">
-              3. Correo Empresa <span className="text-red-500">*</span>
+            <Label htmlFor="direccionEmpresa">
+              3. Dirección Empresa
             </Label>
             <Input
+              id="direccionEmpresa"
+              value={typeof formData.direccionEmpresa === 'string' ? formData.direccionEmpresa : (Array.isArray(formData.direccionEmpresa) ? formData.direccionEmpresa.join(', ') : '')}
+              onChange={(e) => handleInputChange('direccionEmpresa', e.target.value)}
+              placeholder="Ingrese dirección de la empresa (opcional)"
+              className="block w-full border rounded px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <MultiEmailInput
+              value={Array.isArray(formData.correoEmpresa) ? formData.correoEmpresa : (formData.correoEmpresa ? [formData.correoEmpresa] : [])}
+              onChange={(emails) => handleInputChange('correoEmpresa', emails)}
+              label="4. Correos Empresa"
+              placeholder="Ingrese correo y presione Enter o +"
               id="correoEmpresa"
-              type="email"
-              value={formData.correoEmpresa}
-              onChange={(e) => handleInputChange('correoEmpresa', e.target.value)}
-              placeholder="Ingrese correo de la empresa"
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="telefonoEmpresa">
+              5. Teléfono Empresa <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="telefonoEmpresa"
+              type="tel"
+              value={formData.telefonoEmpresa}
+              onChange={(e) => handleInputChange('telefonoEmpresa', e.target.value)}
+              placeholder="Ingrese teléfono de la empresa"
               required
             />
           </div>
@@ -100,7 +126,7 @@ export function StepOne({
           <div className="grid grid-cols-3 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="diaAccidente">
-                4. Día del Accidente <span className="text-red-500">*</span>
+                6. Día del Accidente <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="diaAccidente"
@@ -116,7 +142,7 @@ export function StepOne({
 
             <div className="grid gap-2">
               <Label htmlFor="mesAccidente">
-                5. Mes del Accidente <span className="text-red-500">*</span>
+                7. Mes del Accidente <span className="text-red-500">*</span>
               </Label>
               <Select value={formData.mesAccidente} onValueChange={(value) => handleInputChange('mesAccidente', value)} required>
                 <SelectTrigger>
@@ -141,7 +167,7 @@ export function StepOne({
 
             <div className="grid gap-2">
               <Label htmlFor="añoAccidente">
-                6. Año del Accidente <span className="text-red-500">*</span>
+                8. Año del Accidente <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="añoAccidente"
@@ -158,7 +184,7 @@ export function StepOne({
 
           <div className="grid gap-2">
             <Label htmlFor="direccionAccidente">
-              7. Dirección del Accidente <span className="text-red-500">*</span>
+              9. Dirección del Accidente <span className="text-red-500">*</span>
             </Label>
             <Input
               id="direccionAccidente"
@@ -171,7 +197,7 @@ export function StepOne({
 
           <div className="grid gap-2">
             <Label htmlFor="ciudad">
-              8. Ciudad <span className="text-red-500">*</span>
+              10. Ciudad <span className="text-red-500">*</span>
             </Label>
             <Input
               id="ciudad"
@@ -184,7 +210,7 @@ export function StepOne({
 
           <div className="grid gap-2">
             <Label htmlFor="departamento">
-              9. Departamento <span className="text-red-500">*</span>
+              11. Departamento <span className="text-red-500">*</span>
             </Label>
             <Select value={formData.departamento} onValueChange={(value) => handleInputChange('departamento', value)} required>
               <SelectTrigger>
@@ -234,7 +260,7 @@ export function StepOne({
           
           <div className="grid gap-2">
             <Label htmlFor="placasPrimerVehiculo">
-              10. Placas Primer Vehículo <span className="text-red-500">*</span>
+              12. Placas Primer Vehículo <span className="text-red-500">*</span>
             </Label>
             <Input
               id="placasPrimerVehiculo"
@@ -247,7 +273,7 @@ export function StepOne({
 
           <div className="grid gap-2">
             <Label htmlFor="propietarioPrimerVehiculo">
-              11. Propietario Primer Vehículo <span className="text-red-500">*</span>
+              13. Propietario Primer Vehículo <span className="text-red-500">*</span>
             </Label>
             <Input
               id="propietarioPrimerVehiculo"
@@ -260,7 +286,7 @@ export function StepOne({
 
           <div className="grid gap-2">
             <Label htmlFor="placasSegundoVehiculo">
-              12. Placas Segundo Vehículo <span className="text-red-500">*</span>
+              14. Placas Segundo Vehículo <span className="text-red-500">*</span>
             </Label>
             <Input
               id="placasSegundoVehiculo"
@@ -273,7 +299,7 @@ export function StepOne({
 
           <div className="grid gap-2">
             <Label htmlFor="propietarioSegundoVehiculo">
-              13. Propietario Segundo Vehículo <span className="text-red-500">*</span>
+              15. Propietario Segundo Vehículo <span className="text-red-500">*</span>
             </Label>
             <Input
               id="propietarioSegundoVehiculo"
@@ -291,7 +317,7 @@ export function StepOne({
           
           <div className="grid gap-2">
             <Label htmlFor="conductorVehiculoInfractor">
-              14. Conductor Vehículo Infractor <span className="text-red-500">*</span>
+              16. Conductor Vehículo Infractor <span className="text-red-500">*</span>
             </Label>
             <Input
               id="conductorVehiculoInfractor"
@@ -304,7 +330,7 @@ export function StepOne({
 
           <div className="grid gap-2">
             <Label htmlFor="cedulaConductorInfractor">
-              15. Cédula del Conductor Infractor <span className="text-red-500">*</span>
+              17. Cédula del Conductor Infractor <span className="text-red-500">*</span>
             </Label>
             <Input
               id="cedulaConductorInfractor"
@@ -322,7 +348,7 @@ export function StepOne({
           
           <div className="grid gap-2">
             <Label htmlFor="numeroPolizaSura">
-              16. Número de Póliza Sura <span className="text-red-500">*</span>
+              18. Número de Póliza Sura <span className="text-red-500">*</span>
             </Label>
             <Input
               id="numeroPolizaSura"
@@ -335,7 +361,7 @@ export function StepOne({
 
           <div className="grid gap-2">
             <Label htmlFor="cuantia">
-              17. Cuantía (Cantidad de dinero por todos los daños) <span className="text-red-500">*</span>
+              19. Cuantía (Cantidad de dinero por todos los daños) <span className="text-red-500">*</span>
             </Label>
             <Input
               id="cuantia"

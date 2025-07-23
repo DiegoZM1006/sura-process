@@ -25,6 +25,7 @@ import {
   Palette,
   RefreshCw
 } from 'lucide-react'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 
 const MenuBar = ({ onRegenerateContent }) => {
   const { editor } = useCurrentEditor()
@@ -580,66 +581,174 @@ const generateRCEDañosTemplate = (formData, caseType) => {
   `;
 };
 
+// Función para generar contenido de la tab "Información Empresa" (solo vista)
+const generateInformacionEmpresa = (formData = {}) => {
+  const formatValue = (value, defaultText = '') => {
+    return value && value.toString().trim() ? value.toString().trim() : defaultText;
+  };
+
+  // Obtener fecha actual formateada
+  const fechaActual = new Date();
+  const monthNames = [
+    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+  ];
+  
+  const diaActual = fechaActual.getDate();
+  const mesActual = monthNames[fechaActual.getMonth()];
+  const añoActual = fechaActual.getFullYear();
+
+  // Datos de la empresa
+  const nombreEmpresa = formatValue(formData.nombreEmpresa, '{nombreEmpresa}');
+  const nitEmpresa = formatValue(formData.nitEmpresa, '{nitEmpresa}');
+  const direccionEmpresa = formatValue(formData.direccionEmpresa, '{direccionEmpresa}');
+  const correoEmpresa = formatValue(formData.correoEmpresa, '{correoEmpresa}');
+  const telefonoEmpresa = formatValue(formData.telefonoEmpresa, '{telefonoEmpresa}');
+
+  // Generar las líneas de dirección y correo (pueden ser múltiples o estar vacías)
+  const direccionLines = direccionEmpresa ? `${direccionEmpresa}<br />` : '';
+  const correoLines = correoEmpresa ? `${correoEmpresa}<br />` : '';
+
+  return `
+<div style="margin-bottom: 20px;">
+  <p>Santiago de Cali, ${diaActual} de ${mesActual} del ${añoActual}</p>
+</div>
+
+<div>
+  <p><strong>Señores:</strong><br />
+  ${nombreEmpresa}<br />
+  <strong>NIT.</strong> ${nitEmpresa}<br />
+  ${direccionLines}
+  ${correoLines}
+  ${telefonoEmpresa}</p>
+</div>
+  `;
+};
+
+// Contenido por defecto para las demás tabs
+const generateTabContent = (tabName) => {
+  return `
+<h2>${tabName}</h2>
+<p>Contenido de ${tabName}. Complete el formulario en el panel izquierdo para generar automáticamente el contenido de esta sección.</p>
+<p>Puede editar este contenido según sea necesario.</p>
+  `;
+};
+
 const StyledEditor = ({ formData = {}, caseType = "" }) => {
+  const [activeTab, setActiveTab] = useState("informacion-empresa");
   const [forceRegenerate, setForceRegenerate] = useState(0);
-  const editorContent = generateFormDataContent(formData, caseType);
-  const editorRef = useRef(null);
   
   const handleRegenerateContent = () => {
-    // Forzar regeneración del contenido incrementando el contador
     setForceRegenerate(prev => prev + 1);
   };
+
+  const tabs = [
+    { id: "informacion-empresa", label: "Información Empresa", readOnly: true },
+    { id: "asunto", label: "Asunto", readOnly: false },
+    { id: "solicitud", label: "Solicitud", readOnly: false },
+    { id: "fundamentos", label: "Fundamentos de Derecho", readOnly: false },
+    { id: "notificaciones", label: "Notificaciones", readOnly: false },
+    { id: "anexos", label: "Anexos", readOnly: false },
+    { id: "firma", label: "Firma", readOnly: false }
+  ];
+
+  const getTabContent = (tabId) => {
+    switch (tabId) {
+      case "informacion-empresa":
+        return generateInformacionEmpresa(formData);
+      case "asunto":
+        return generateTabContent("Asunto");
+      case "solicitud":
+        return generateTabContent("Solicitud");
+      case "fundamentos":
+        return generateTabContent("Fundamentos de Derecho");
+      case "notificaciones":
+        return generateTabContent("Notificaciones");
+      case "anexos":
+        return generateTabContent("Anexos");
+      case "firma":
+        return generateTabContent("Firma");
+      default:
+        return generateTabContent("Contenido");
+    }
+  };
+
+  const currentTab = tabs.find(tab => tab.id === activeTab);
   
   return (
-    <div className="w-full h-full flex flex-col" ref={editorRef}>
+    <div className="w-full h-full flex flex-col">
       <style>{editorStyles}</style>
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-y-scroll flex flex-col h-full">
-        <EditorProvider 
-          slotBefore={<MenuBar onRegenerateContent={handleRegenerateContent} />} 
-          extensions={extensions} 
-          content={editorContent}
-          editorProps={{
-            attributes: {
-              class: "focus:outline-none h-full max-w-none p-6 overflow-y-auto overflow-x-hidden"
-            }
-          }}
-        >
-          <EditorContentUpdater 
-            formData={formData} 
-            caseType={caseType}
-            forceRegenerate={forceRegenerate}
-          />
-        </EditorProvider>
-      </div>
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+        <div className="border-b border-gray-200 bg-white px-4 py-2">
+          <TabsList className="w-full h-12 bg-gray-50">
+            {tabs.map((tab) => (
+              <TabsTrigger 
+                key={tab.id} 
+                value={tab.id}
+                className="flex-1 text-xs font-medium"
+              >
+                {tab.label}
+                {tab.readOnly && <span className="ml-1 text-gray-400">(Vista)</span>}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
+
+        {tabs.map((tab) => (
+          <TabsContent key={tab.id} value={tab.id} className="flex-1 overflow-hidden">
+            <div className="h-full flex flex-col">
+              {tab.readOnly ? (
+                // Vista de solo lectura para "Información Empresa"
+                <div className="bg-gray-50 border border-gray-200 rounded-lg shadow-sm overflow-y-auto flex-1 p-6">
+                  <div className="max-w-none prose prose-sm">
+                    <div dangerouslySetInnerHTML={{ __html: getTabContent(tab.id) }} />
+                  </div>
+                </div>
+              ) : (
+                // Editor editable para las demás tabs
+                <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-y-auto flex-1">
+                  <EditorProvider 
+                    slotBefore={<MenuBar onRegenerateContent={handleRegenerateContent} />} 
+                    extensions={extensions} 
+                    content={getTabContent(tab.id)}
+                    editorProps={{
+                      attributes: {
+                        class: "focus:outline-none h-full max-w-none p-6 overflow-y-auto overflow-x-hidden"
+                      }
+                    }}
+                  >
+                    <EditorContentUpdater 
+                      tabContent={getTabContent(tab.id)}
+                      forceRegenerate={forceRegenerate}
+                    />
+                  </EditorProvider>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        ))}
+      </Tabs>
     </div>
   )
 }
 
-const EditorContentUpdater = ({ formData, caseType, forceRegenerate }) => {
+const EditorContentUpdater = ({ tabContent, forceRegenerate }) => {
   const { editor } = useCurrentEditor()
-  const lastFormDataRef = useRef(null)
-  const lastCaseTypeRef = useRef(null)
+  const lastTabContentRef = useRef(null)
   const lastForceRegenerateRef = useRef(0)
 
   useEffect(() => {
     if (editor) {
-      const newContent = generateFormDataContent(formData, caseType);
-      
-      // Comparar si los datos del formulario han cambiado
-      const currentFormDataString = JSON.stringify(formData);
-      const lastFormDataString = JSON.stringify(lastFormDataRef.current);
-      
-      // Actualizar el contenido si cambió el formulario, el tipo de caso o si se forzó la regeneración
-      if (currentFormDataString !== lastFormDataString || 
-          caseType !== lastCaseTypeRef.current || 
+      // Actualizar el contenido si cambió el contenido de la tab o si se forzó la regeneración
+      if (tabContent !== lastTabContentRef.current || 
           forceRegenerate !== lastForceRegenerateRef.current) {
-        editor.commands.setContent(newContent);
-        lastFormDataRef.current = formData;
-        lastCaseTypeRef.current = caseType;
+        editor.commands.setContent(tabContent);
+        lastTabContentRef.current = tabContent;
         lastForceRegenerateRef.current = forceRegenerate;
       }
     }
-  }, [editor, formData, caseType, forceRegenerate])
+  }, [editor, tabContent, forceRegenerate])
 
   return null
 }

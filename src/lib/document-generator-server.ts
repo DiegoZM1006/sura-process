@@ -59,8 +59,14 @@ const prepareTemplateData = async (formData: any) => {
     // Información de la empresa/destinatario (usando los nombres del formulario)
     nombreEmpresa: formatValue(formData.nombreEmpresa, 'XXXXXXXXXXXXXXX'),
     nitEmpresa: formatValue(formData.nitEmpresa, 'XXXXXXXXXXXXXXX'),
-    correoEmpresa: formatValue(formData.correoEmpresa, 'XXXXXXXXXXXXXXX'),
-    
+    telefonoEmpresa: formatValue(formData.telefonoEmpresa, 'XXXXXXXXXXXXXXX'),
+    direccionEmpresa: formatValue(formData.direccionEmpresa, 'XXXXXXXXXXXXXXX'),
+    correos: Array.isArray(formData.correoEmpresa)
+      ? formData.correoEmpresa.filter((c: string) => !!c && c.trim()).map((c: string) => ({ correoEmpresa: c.trim() }))
+      : formData.correoEmpresa && formData.correoEmpresa.trim()
+        ? [{ correoEmpresa: formData.correoEmpresa.trim() }]
+        : [],
+
     // Datos del accidente (usando los nombres del formulario)
     diaAccidente: formatValue(formData.diaAccidente, 'XX'),
     mesAccidente: formatValue(formData.mesAccidente, 'XXXXXXX'),

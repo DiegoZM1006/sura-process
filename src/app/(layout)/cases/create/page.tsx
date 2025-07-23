@@ -28,6 +28,8 @@ export default function CreateCasePage() {
         nombreEmpresa: "",
         nitEmpresa: "",
         correoEmpresa: "",
+        direccionEmpresa: "",
+        telefonoEmpresa: "",
         diaAccidente: "",
         mesAccidente: "",
         añoAccidente: "",
@@ -53,8 +55,8 @@ export default function CreateCasePage() {
         }
     }, [searchParams])
 
-    const handleInputChange = (field: string, value: string) => {
-        setFormData(prev => ({ ...prev, [field]: value }))
+    const handleInputChange = (field: string, value: string | string[]) => {
+        setFormData(prev => ({ ...prev, [field]: typeof value === 'string' ? value : (Array.isArray(value) ? value.join(', ') : '') }))
     }
 
     const nextStep = () => {
