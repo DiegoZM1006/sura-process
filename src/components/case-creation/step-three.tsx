@@ -30,10 +30,64 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
   const handleDownloadWord = async () => {
     setIsDownloadingWord(true)
     try {
-      await generateDocument(formData, caseType)
+      // Crear FormData con los datos del formulario y anexos
+      const formDataForDownload = new FormData()
+      
+      // Agregar datos del formulario
+      Object.keys(formData).forEach(key => {
+        if (key === 'anexos' && formData[key]) {
+          // Agregar cada archivo anexo
+          formData[key].forEach((file: File) => {
+            formDataForDownload.append('anexos', file)
+          })
+        } else if (formData[key]) {
+          formDataForDownload.append(key, formData[key])
+        }
+      })
+      
+      // Agregar tipo de caso
+      formDataForDownload.append('caseType', caseType)
+      
+      // Llamar a la nueva API de descarga
+      const response = await fetch('/api/download-word', {
+        method: 'POST',
+        body: formDataForDownload
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error al generar el documento')
+      }
+      
+      // Obtener el archivo y crear la descarga
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      
+      // Extraer el nombre del archivo desde el header Content-Disposition
+      const contentDisposition = response.headers.get('Content-Disposition')
+      let filename = `${caseType.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="([^"]+)"/)
+        if (filenameMatch) {
+          filename = filenameMatch[1]
+        }
+      }
+      
+      // Crear elemento de descarga
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      
+      // Limpiar
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      
     } catch (error) {
-      console.error('Error al descargar Word:', error)
-      alert('Error al generar el documento Word. Por favor, intente nuevamente.')
+      console.error('Error al descargar Word con anexos:', error)
+      alert('Error al generar el documento Word con anexos. Por favor, intente nuevamente.')
     } finally {
       setIsDownloadingWord(false)
     }
@@ -138,12 +192,12 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
               {isDownloadingWord ? (
                 <>
                   <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                  Generando Word...
+                  Generando documento...
                 </>
               ) : (
                 <>
                   <Download className="h-4 w-4" />
-                  Descargar Word
+                  Descargar con Anexos
                 </>
               )}
             </Button>
@@ -154,7 +208,10 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
         <div className="mt-3 text-sm text-gray-600">
           <p><strong>Tipo:</strong> {caseType}</p>
           <p><strong>Estado:</strong> Listo para envío</p>
-          <p><strong>Formato:</strong> Word (.docx) con imágenes</p>
+          <p><strong>Formato:</strong> PDF con anexos incluidos</p>
+          {formData?.anexos && formData.anexos.length > 0 && (
+            <p><strong>Anexos:</strong> {formData.anexos.length} archivo(s)</p>
+          )}
         </div>
       </div>
 

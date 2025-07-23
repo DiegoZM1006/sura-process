@@ -3,6 +3,7 @@ import Docxtemplater from 'docxtemplater'
 import PizZip from 'pizzip'
 import fs from 'fs'
 import path from 'path'
+import libre from 'libreoffice-convert'
 
 // Función para formatear fechas en español
 const formatDateSpanish = (dateValue: string) => {
@@ -153,15 +154,51 @@ export const generateDocumentBlobServer = async (formData: any, caseType: string
     
     console.log('Documento generado, tamaño:', outputBuffer.length, 'bytes')
     
-    // Convertir Buffer a Blob
-    const blob = new Blob([outputBuffer], {
-      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    })
-    
-    console.log('=== DOCUMENTO GENERADO EXITOSAMENTE ===')
-    console.log('Tamaño del blob:', blob.size, 'bytes')
-    
-    return blob
+    // Intentar convertir a PDF usando LibreOffice
+    try {
+      console.log('Intentando conversión a PDF con LibreOffice...')
+      
+      // Configurar la ruta de LibreOffice si no está en el PATH
+      const libreOfficePath = 'C:\\Program Files\\LibreOffice\\program\\soffice.exe'
+      if (require('fs').existsSync(libreOfficePath)) {
+        process.env.LIBREOFFICE_PATH = libreOfficePath
+        console.log('Configurando ruta de LibreOffice:', libreOfficePath)
+      }
+      
+      const pdfBuffer = await new Promise<Buffer>((resolve, reject) => {
+        libre.convert(outputBuffer, '.pdf', undefined, (err, done) => {
+          if (err) {
+            console.error('Error en conversión LibreOffice:', err)
+            reject(err)
+          } else {
+            console.log('Conversión a PDF exitosa')
+            resolve(done as Buffer)
+          }
+        })
+      })
+
+      const blob = new Blob([pdfBuffer], {
+        type: 'application/pdf'
+      })
+      
+      console.log('=== DOCUMENTO PDF GENERADO EXITOSAMENTE ===')
+      console.log('Tamaño del blob PDF:', blob.size, 'bytes')
+      
+      return blob
+      
+    } catch (pdfError) {
+      console.warn('Error al convertir a PDF, enviando DOCX original:', pdfError)
+      
+      // Si falla la conversión a PDF, enviar DOCX
+      const blob = new Blob([outputBuffer], {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      })
+      
+      console.log('=== DOCUMENTO DOCX GENERADO COMO FALLBACK ===')
+      console.log('Tamaño del blob DOCX:', blob.size, 'bytes')
+      
+      return blob
+    }
     
   } catch (error) {
     console.error('=== ERROR AL GENERAR DOCUMENTO EN SERVIDOR ===')

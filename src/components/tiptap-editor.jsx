@@ -463,7 +463,7 @@ const generateRCEDañosTemplate = (formData, caseType) => {
 </div>
 
 <div style="margin-bottom: 40px;">
-  <p style="text-align: right;">Santiago de Cali, ${formatValue(formData.diaActual, fechaActual.getDate().toString())} de ${formatValue(formData.mesActual, monthNames[fechaActual.getMonth()])} del ${formatValue(formData.añoActual, fechaActual.getFullYear().toString())}</p>
+  <p style="text-align: right;">Santiago de Cali, ${fechaActual.getDate()} de ${monthNames[fechaActual.getMonth()]} del ${fechaActual.getFullYear()}</p>
 </div>
 
 <div style="margin-bottom: 30px;">

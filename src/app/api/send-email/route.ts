@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import { generateDocumentBlob } from '@/lib/document-generator-server'
+import { mergePDFsWithAnnexes } from '@/lib/pdf-merger'
 
 export async function GET() {
   return NextResponse.json({ 
@@ -138,50 +139,121 @@ export async function POST(request: NextRequest) {
     console.log('Preparando anexos para el correo...')
     const attachments = []
     
-    // Añadir documento Word principal
+    // Procesar documento principal y anexos
     try {
       const documentBuffer = Buffer.from(await documentBlob.arrayBuffer())
       const fecha = new Date().toISOString().split('T')[0]
-      attachments.push({
-        filename: `${caseType.replace(/\s+/g, '_')}_${fecha}.docx`,
-        content: documentBuffer,
-        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      })
-      console.log('Documento Word añadido como anexo')
+      
+      // Detectar el tipo de archivo basado en el content type del blob
+      const isPDF = documentBlob.type === 'application/pdf'
+      
+      if (isPDF && anexoFiles.length > 0) {
+        console.log('Documento principal es PDF y hay anexos - realizando merge...')
+        
+        // Preparar anexos para el merge
+        const annexBuffers = []
+        for (let i = 0; i < anexoFiles.length; i++) {
+          const anexo = anexoFiles[i]
+          try {
+            const anexoBuffer = Buffer.from(await anexo.arrayBuffer())
+            annexBuffers.push({
+              buffer: anexoBuffer,
+              filename: anexo.name,
+              mimetype: anexo.type || 'application/octet-stream'
+            })
+            console.log(`Anexo ${i + 1} preparado para merge: ${anexo.name}`)
+          } catch (error) {
+            console.error(`Error preparando anexo ${anexo.name} para merge:`, error)
+          }
+        }
+        
+        // Hacer el merge de PDFs
+        try {
+          console.log('Iniciando merge de PDF principal con anexos...')
+          const mergedPdfBuffer = await mergePDFsWithAnnexes(documentBuffer, annexBuffers)
+          
+          attachments.push({
+            filename: `${caseType.replace(/\s+/g, '_')}_${fecha}_COMPLETO.pdf`,
+            content: mergedPdfBuffer,
+            contentType: 'application/pdf'
+          })
+          console.log('PDF combinado creado exitosamente')
+          
+        } catch (mergeError) {
+          console.error('Error en el merge, enviando archivos por separado:', mergeError)
+          
+          // Si falla el merge, enviar archivos por separado
+          attachments.push({
+            filename: `${caseType.replace(/\s+/g, '_')}_${fecha}.pdf`,
+            content: documentBuffer,
+            contentType: 'application/pdf'
+          })
+          
+          // Agregar anexos por separado
+          for (let i = 0; i < anexoFiles.length; i++) {
+            const anexo = anexoFiles[i]
+            try {
+              const anexoBuffer = Buffer.from(await anexo.arrayBuffer())
+              const timestamp = Date.now()
+              const fileExtension = anexo.name.split('.').pop() || ''
+              const fileName = `anexo_${i + 1}_${timestamp}.${fileExtension}`
+              
+              attachments.push({
+                filename: fileName,
+                content: anexoBuffer,
+                contentType: anexo.type || 'application/octet-stream'
+              })
+            } catch (error) {
+              console.error(`Error procesando anexo ${anexo.name}:`, error)
+            }
+          }
+        }
+        
+      } else {
+        // Si no es PDF o no hay anexos, procesar normalmente
+        const fileExtension = isPDF ? 'pdf' : 'docx'
+        const contentType = isPDF ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        
+        attachments.push({
+          filename: `${caseType.replace(/\s+/g, '_')}_${fecha}.${fileExtension}`,
+          content: documentBuffer,
+          contentType: contentType
+        })
+        console.log(`Documento ${fileExtension.toUpperCase()} añadido como anexo`)
+        
+        // Añadir anexos del step 2 por separado si existen
+        if (anexoFiles.length > 0) {
+          console.log(`Procesando ${anexoFiles.length} anexos del step 2 por separado...`)
+          
+          for (let i = 0; i < anexoFiles.length; i++) {
+            const anexo = anexoFiles[i]
+            try {
+              const anexoBuffer = Buffer.from(await anexo.arrayBuffer())
+              
+              const timestamp = Date.now()
+              const fileExtension = anexo.name.split('.').pop() || ''
+              const fileName = `anexo_${i + 1}_${timestamp}.${fileExtension}`
+              
+              attachments.push({
+                filename: fileName,
+                content: anexoBuffer,
+                contentType: anexo.type || 'application/octet-stream'
+              })
+              
+              console.log(`Anexo ${i + 1} procesado: ${anexo.name} -> ${fileName}`)
+            } catch (error) {
+              console.error(`Error procesando anexo ${anexo.name}:`, error)
+            }
+          }
+        }
+      }
+      
     } catch (error) {
       console.error('Error procesando documento principal:', error)
       return NextResponse.json(
         { success: false, error: 'Error procesando el documento principal' },
         { status: 500 }
       )
-    }
-
-    // Añadir anexos del step 2 como archivos adjuntos separados
-    if (anexoFiles.length > 0) {
-      console.log(`Procesando ${anexoFiles.length} anexos del step 2...`)
-      
-      for (let i = 0; i < anexoFiles.length; i++) {
-        const anexo = anexoFiles[i]
-        try {
-          const anexoBuffer = Buffer.from(await anexo.arrayBuffer())
-          
-          // Generar nombre de archivo único
-          const timestamp = Date.now()
-          const fileExtension = anexo.name.split('.').pop() || ''
-          const fileName = `anexo_${i + 1}_${timestamp}.${fileExtension}`
-          
-          attachments.push({
-            filename: fileName,
-            content: anexoBuffer,
-            contentType: anexo.type || 'application/octet-stream'
-          })
-          
-          console.log(`Anexo ${i + 1} procesado: ${anexo.name} -> ${fileName}`)
-        } catch (error) {
-          console.error(`Error procesando anexo ${anexo.name}:`, error)
-          // Continuar con los demás anexos aunque uno falle
-        }
-      }
     }
     
     console.log(`Total de anexos preparados: ${attachments.length}`)
@@ -269,15 +341,22 @@ export async function POST(request: NextRequest) {
     }
     
     console.log('=== RESPUESTA EXITOSA ===')
+    
+    // Determinar si se hizo merge o se enviaron archivos separados
+    const mergedFile = attachments.find(att => att.filename.includes('_COMPLETO.pdf'))
+    const hasMergedPDF = !!mergedFile
+    
     const successResponse = { 
       success: true, 
       message: 'Correo enviado exitosamente',
       messageId: info.messageId,
       recipients: emailRecipients.length,
       attachments: {
-        documento: 1,
-        anexos: anexoFiles.length,
-        total: 1 + anexoFiles.length
+        total: attachments.length,
+        merged: hasMergedPDF,
+        description: hasMergedPDF 
+          ? `PDF combinado con ${anexoFiles.length} anexos integrados`
+          : `${attachments.length} archivos adjuntos (documento principal + ${anexoFiles.length} anexos)`
       }
     }
     console.log('Respuesta exitosa:', successResponse)
