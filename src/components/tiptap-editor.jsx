@@ -659,7 +659,7 @@ const StyledEditor = ({ formData = {}, caseType = "" }) => {
     { id: "asunto", label: "Asunto", readOnly: true },
     { id: "solicitud", label: "Solicitud", readOnly: true },
     { id: "fundamentos", label: "Fundamentos de Derecho", readOnly: false },
-    { id: "notificaciones", label: "Notificaciones", readOnly: false },
+    { id: "notificaciones", label: "Notificaciones", readOnly: true },
     { id: "anexos", label: "Anexos", readOnly: false },
     { id: "firma", label: "Firma", readOnly: false }
   ];
@@ -687,7 +687,11 @@ De manera respetuosa solicitamos que <strong>${nombreEmpresa}</strong> cancele a
       case "fundamentos":
         return generateTabContent("Fundamentos de Derecho");
       case "notificaciones":
-        return generateTabContent("Notificaciones");
+        return `
+<div style="text-align: justify;">
+Es interés de Seguros Generales Suramericana S.A. poder invitarlo a que podamos materializar un acuerdo beneficioso para ambas partes que evite desgastes administrativos y judiciales para ambas partes, por lo anterior en caso de que resulte de su interés poder que realicemos acercamientos al respecto, nos permitimos informarle que el recobro del presente siniestro ha sido asignado a la firma de abogados externos BTL Legal Group S.A.S. ubicada en la Avenida 6AN 25N – 22 Piso Tercero, Cali - Valle del Cauca y con números de teléfonos 6686611, , WhatsApp 323 6214498 y correo electrónico subrogacion10@btllegalgroup.com. Empresa con la cual podrá comunicarse en caso de que resulte de su interés poder llegar a un acuerdo para zanjar la presente controversia.
+</div>
+`;
       case "anexos":
         return generateTabContent("Anexos");
       case "firma":
