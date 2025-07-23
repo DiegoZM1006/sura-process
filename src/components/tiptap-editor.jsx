@@ -644,7 +644,7 @@ const StyledEditor = ({ formData = {}, caseType = "" }) => {
 
   const tabs = [
     { id: "informacion-empresa", label: "Información Empresa", readOnly: true },
-    { id: "asunto", label: "Asunto", readOnly: false },
+    { id: "asunto", label: "Asunto", readOnly: true },
     { id: "solicitud", label: "Solicitud", readOnly: false },
     { id: "fundamentos", label: "Fundamentos de Derecho", readOnly: false },
     { id: "notificaciones", label: "Notificaciones", readOnly: false },
@@ -657,7 +657,11 @@ const StyledEditor = ({ formData = {}, caseType = "" }) => {
       case "informacion-empresa":
         return generateInformacionEmpresa(formData);
       case "asunto":
-        return generateTabContent("Asunto");
+        return `
+<div style="text-align: justify;">
+<strong>JORGE ARMANDO LASSO DUQUE</strong>, identificado como aparece al pie de mi firma, obrando en calidad de Representante Legal General de la compañía <strong>SEGUROS GENERALES SURA S.A.</strong>, de conformidad con el poder otorgado mediante Escritura Pública No. 392 del 12 de abril de 2016, Clausula Primera, Numeral (5), presento <strong>RECLAMACIÓN FORMAL</strong> por el pago de perjuicios, con fundamento en los siguientes:
+</div>
+`;
       case "solicitud":
         return generateTabContent("Solicitud");
       case "fundamentos":
