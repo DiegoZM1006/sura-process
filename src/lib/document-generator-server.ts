@@ -1,3 +1,13 @@
+// Helper para formatear cuantía con separador de miles
+const formatCurrency = (value: string | number) => {
+  if (typeof value === 'number') {
+    return value.toLocaleString('es-CO');
+  }
+  if (typeof value === 'string' && value.match(/^\d+$/)) {
+    return parseInt(value, 10).toLocaleString('es-CO');
+  }
+  return value || 'XXXXXXXX';
+};
 // Versión server-side del generador de documentos
 import Docxtemplater from 'docxtemplater'
 import PizZip from 'pizzip'
@@ -86,7 +96,7 @@ const prepareTemplateData = async (formData: any) => {
     cedulaConductorInfractor: formatValue(formData.cedulaConductorInfractor, '1XXXXXXXX'),
     
     // Información económica y póliza (usando los nombres del formulario)
-    cuantia: formatValue(formData.cuantia, 'XXXXXXXX'),
+    cuantia: formatCurrency(formData.cuantia),
     numeroPolizaSura: formatValue(formData.numeroPolizaSura, 'XXXXXXXXXX')
   }
 }

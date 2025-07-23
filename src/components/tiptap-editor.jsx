@@ -1,3 +1,13 @@
+// Helper para formatear cuantía con separador de miles
+const formatCurrency = (value) => {
+  if (typeof value === 'number') {
+    return value.toLocaleString('es-CO');
+  }
+  if (typeof value === 'string' && value.match(/^\d+$/)) {
+    return parseInt(value, 10).toLocaleString('es-CO');
+  }
+  return value || '{cuantia}';
+};
 import { Color } from '@tiptap/extension-color'
 import ListItem from '@tiptap/extension-list-item'
 import TextStyle from '@tiptap/extension-text-style'
@@ -407,7 +417,7 @@ const generateFormDataContent = (formData, caseType = "") => {
 
 <h2>💰 Información Económica</h2>
 <ul>
-  <li><strong>Cuantía (Total de daños):</strong> ${formatValue(formData.cuantia)}</li>
+  <li><strong>Cuantía (Total de daños):</strong> $ ${formatCurrency(formData.cuantia)}</li>
 </ul>
 
 <hr>
@@ -492,7 +502,7 @@ const generateRCEDañosTemplate = (formData, caseType) => {
 
   <p><strong>3.</strong> El vehículo de placas ${formatValue(formData.placasPrimerVehiculo, 'XXXXXX')} se encontraba asegurado al momento del accidente por la póliza de seguros ${formatValue(formData.numeroPolizaSura, 'XXXXXXXXXX')} expedida por Seguros Generales Suramericana.</p>
 
-  <p><strong>4.</strong> Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de ${formatValue(formData.cuantia, 'XXXXXXXX')} por concepto de reparación de los daños materiales sufridos al vehículo de placas ${formatValue(formData.placasPrimerVehiculo, 'XXXXXXX')}.</p>
+  <p><strong>4.</strong> Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${formatCurrency(formData.cuantia)} por concepto de reparación de los daños materiales sufridos al vehículo de placas ${formatValue(formData.placasPrimerVehiculo, 'XXXXXXX')}.</p>
 </div>
 
 <div style="text-align: justify; margin-bottom: 30px;">
@@ -502,7 +512,7 @@ const generateRCEDañosTemplate = (formData, caseType) => {
 <h2><strong>SOLICITUD</strong></h2>
 
 <div style="text-align: justify; margin-bottom: 40px;">
-  <p>De manera respetuosa solicitamos que ${formatValue(formData.nombreEmpresa, 'XXXXXXXXX')} cancele a favor de Seguros Generales Sura S.A. la suma de ${formatValue(formData.cuantia, 'XXXXXXXX')} en virtud de la subrogación consignada en el artículo 1096 del Código de Comercio.</p>
+  <p>De manera respetuosa solicitamos que ${formatValue(formData.nombreEmpresa, 'XXXXXXXXX')} cancele a favor de Seguros Generales Sura S.A. la suma de $ ${formatCurrency(formData.cuantia)} en virtud de la subrogación consignada en el artículo 1096 del Código de Comercio.</p>
 </div>
 
 <h2><strong>FUNDAMENTOS DE DERECHO</strong></h2>
@@ -620,7 +630,9 @@ const generateInformacionEmpresa = (formData = {}) => {
   <strong>NIT.</strong> ${nitEmpresa}<br />
   ${direccionLines}
   ${correoLines}
-  ${telefonoEmpresa}</p>
+  ${telefonoEmpresa}<br />
+  <strong>Cuantía:</strong> $ ${formatCurrency(formData.cuantia)}
+  </p>
 </div>
   `;
 };
@@ -645,7 +657,7 @@ const StyledEditor = ({ formData = {}, caseType = "" }) => {
   const tabs = [
     { id: "informacion-empresa", label: "Información Empresa", readOnly: true },
     { id: "asunto", label: "Asunto", readOnly: true },
-    { id: "solicitud", label: "Solicitud", readOnly: false },
+    { id: "solicitud", label: "Solicitud", readOnly: true },
     { id: "fundamentos", label: "Fundamentos de Derecho", readOnly: false },
     { id: "notificaciones", label: "Notificaciones", readOnly: false },
     { id: "anexos", label: "Anexos", readOnly: false },
@@ -662,8 +674,16 @@ const StyledEditor = ({ formData = {}, caseType = "" }) => {
 <strong>JORGE ARMANDO LASSO DUQUE</strong>, identificado como aparece al pie de mi firma, obrando en calidad de Representante Legal General de la compañía <strong>SEGUROS GENERALES SURA S.A.</strong>, de conformidad con el poder otorgado mediante Escritura Pública No. 392 del 12 de abril de 2016, Clausula Primera, Numeral (5), presento <strong>RECLAMACIÓN FORMAL</strong> por el pago de perjuicios, con fundamento en los siguientes:
 </div>
 `;
-      case "solicitud":
-        return generateTabContent("Solicitud");
+      case "solicitud": {
+        // Variables del formulario
+        const nombreEmpresa = formData?.nombreEmpresa || '{nombreEmpresa}';
+        const cuantia = formatCurrency(formData?.cuantia);
+        return `
+<div style="text-align: justify;">
+De manera respetuosa solicitamos que <strong>${nombreEmpresa}</strong> cancele a favor de <strong>Seguros Generales Sura S.A.</strong> la suma de <strong>$ ${cuantia}</strong> en virtud de la subrogación consignada en el artículo 1096 del Código de Comercio.
+</div>
+`;
+      }
       case "fundamentos":
         return generateTabContent("Fundamentos de Derecho");
       case "notificaciones":

@@ -1,3 +1,13 @@
+// Helper para formatear cuantía con separador de miles
+const formatCurrency = (value: string | number) => {
+  if (typeof value === 'number') {
+    return value.toLocaleString('es-CO');
+  }
+  if (typeof value === 'string' && value.match(/^\d+$/)) {
+    return parseInt(value, 10).toLocaleString('es-CO');
+  }
+  return value || 'XXXXXXXX';
+};
 // Servidor - sin "use client"
 
 import Docxtemplater from 'docxtemplater'
@@ -168,7 +178,7 @@ const prepareTemplateData = async (formData: FormData) => {
       : formData.correoEmpresa && formData.correoEmpresa.trim()
         ? [{ correoEmpresa: formData.correoEmpresa.trim() }]
         : [],
-        
+
     // Datos del accidente (exactamente como en la plantilla)
     diaAccidente: formatValue(formData.diaAccidente, 'XX'),
     mesAccidente: formatValue(formData.mesAccidente, 'XXXXXXX'),
@@ -188,7 +198,7 @@ const prepareTemplateData = async (formData: FormData) => {
     cedulaConductorInfractor: formatValue(formData.cedulaConductorInfractor, '1XXXXXXXX'),
     
     // Información económica y póliza (exactamente como en la plantilla)
-    cuantia: formatValue(formData.cuantia, 'XXXXXXXX'),
+    cuantia: formatCurrency(formData.cuantia),
     numeroPolizaSura: formatValue(formData.numeroPolizaSura, 'XXXXXXXXXX'),
 
     // Anexos adicionales
