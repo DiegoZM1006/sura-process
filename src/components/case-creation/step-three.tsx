@@ -6,6 +6,7 @@ import { Eye, Download, Mail, FileText } from "lucide-react"
 import TiptapEditor from "@/components/tiptap-editor"
 import { EmailModal } from "./email-modal"
 import { generateDocument } from "@/lib/document-generator"
+import { getDefaultAnexosContent } from '@/components/tiptap-editor'
 
 interface StepThreeProps {
   onPrev: () => void
@@ -26,6 +27,13 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isDownloadingWord, setIsDownloadingWord] = useState(false)
+  // Estado para los contenidos de los tabs, inicializando anexos con valor por defecto
+  const [tabContents, setTabContents] = useState<{ anexos: string; hechos?: string }>({ anexos: getDefaultAnexosContent(formData) })
+
+  // Handler para cambios en los tabs del editor
+  const handleTabContentChange = (tabId: string, content: string) => {
+    setTabContents(prev => ({ ...prev, [tabId]: content }))
+  }
 
   const handleDownloadWord = async () => {
     setIsDownloadingWord(true)
@@ -44,6 +52,15 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
           formDataForDownload.append(key, formData[key])
         }
       })
+      
+      // Agregar el contenido de anexos como 'contenidoAnexos'
+      if (tabContents.anexos) {
+        formDataForDownload.append('contenidoAnexos', String(tabContents.anexos))
+      }
+      // Agregar el contenido de hechos como 'contenidoHechos'
+      if (tabContents.hechos) {
+        formDataForDownload.append('contenidoHechos', String(tabContents.hechos))
+      }
       
       // Agregar tipo de caso
       formDataForDownload.append('caseType', caseType)
@@ -110,6 +127,15 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
           formDataWithEmail.append(key, formData[key])
         }
       })
+      
+      // Agregar el contenido de anexos como 'contenidoAnexos'
+      if (tabContents.anexos) {
+        formDataWithEmail.append('contenidoAnexos', String(tabContents.anexos))
+      }
+      // Agregar el contenido de hechos como 'contenidoHechos'
+      if (tabContents.hechos) {
+        formDataWithEmail.append('contenidoHechos', String(tabContents.hechos))
+      }
       
       // Agregar datos del email
       formDataWithEmail.append('emailRecipients', JSON.stringify(emailData.recipients))
@@ -220,6 +246,8 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
         <TiptapEditor 
           formData={formData} 
           caseType={caseType}
+          tabContents={tabContents}
+          onTabContentChange={handleTabContentChange}
         />
       </div>
 

@@ -8,6 +8,7 @@ const formatCurrency = (value: string | number) => {
   }
   return value || 'XXXXXXXX';
 };
+
 // Versión server-side del generador de documentos
 import Docxtemplater from 'docxtemplater'
 import PizZip from 'pizzip'
@@ -39,7 +40,7 @@ const formatValue = (value: string, defaultText = 'XXXXXXX') => {
 }
 
 // Función para preparar los datos para la plantilla
-const prepareTemplateData = async (formData: any) => {
+const prepareTemplateData = async (formData: any, tabContents?: any) => {
   // Obtener fecha actual formateada
   const fechaActual = new Date()
   const fechaHoy = formatDateSpanish(fechaActual.toISOString())
@@ -57,6 +58,12 @@ const prepareTemplateData = async (formData: any) => {
   const fechaAccidenteCompleta = formData.diaAccidente && formData.mesAccidente && formData.añoAccidente
     ? `${formData.diaAccidente} de ${formData.mesAccidente} del ${formData.añoAccidente}`
     : 'XXX de XXXX del 2024'
+
+  // Preparar contenido de anexos
+  const anexosContent = tabContents?.anexos || formData.contenidoAnexos || getDefaultAnexosContent(formData)
+  
+  // Preparar contenido de hechos
+  const hechosContent = tabContents?.hechos || formData.contenidoHechos || getDefaultHechosContent(formData);
 
   return {
     // Datos básicos con fecha actual
@@ -97,15 +104,61 @@ const prepareTemplateData = async (formData: any) => {
     
     // Información económica y póliza (usando los nombres del formulario)
     cuantia: formatCurrency(formData.cuantia),
-    numeroPolizaSura: formatValue(formData.numeroPolizaSura, 'XXXXXXXXXX')
+    numeroPolizaSura: formatValue(formData.numeroPolizaSura, 'XXXXXXXXXX'),
+    
+    // Contenido de anexos editado por el usuario
+    anexos: anexosContent,
+    contenidoAnexos: anexosContent,
+    contenidoHechos: hechosContent, // <-- nuevo campo para docxtemplater
   }
 }
 
-export const generateDocumentBlobServer = async (formData: any, caseType: string): Promise<Blob> => {
+// Función para obtener contenido por defecto de anexos (debe coincidir con el frontend)
+const getDefaultAnexosContent = (formData: any = {}) => {
+  const numeroPoliza = formData.numeroPolizaSura || '{numeroPolizaSura}';
+  
+  return `
+1. Aviso de siniestro de póliza ${numeroPoliza} expedida por Seguros Generales Sura S.A.
+
+2. Registro fotográfico dispuesto en el Artículo 16 de la Ley 2251 del 2022 / IPAT.
+
+3. Constancia de pago de daños materiales del vehículo asegurado por Sura S.A.
+
+4. Copia simple de la Escritura Pública No. 392 del 12 de abril de 2016, a través del cual se otorga la representación legal general al suscrito.`;
+};
+
+// Agregar función getDefaultHechosContent
+const getDefaultHechosContent = (formData: any = {}) => {
+  const diaAccidente = formData.diaAccidente || '{diaAccidente}';
+  const mesAccidente = formData.mesAccidente || '{mesAccidente}';
+  const añoAccidente = formData.añoAccidente || '{añoAccidente}';
+  const direccionAccidente = formData.direccionAccidente || '{direccionAccidente}';
+  const ciudad = formData.ciudad || '{ciudad}';
+  const departamento = formData.departamento || '{departamento}';
+  const placasPrimerVehiculo = formData.placasPrimerVehiculo || '{placasPrimerVehiculo}';
+  const propietarioPrimerVehiculo = formData.propietarioPrimerVehiculo || '{propietarioPrimerVehiculo}';
+  const placasSegundoVehiculo = formData.placasSegundoVehiculo || '{placasSegundoVehiculo}';
+  const propietarioSegundoVehiculo = formData.propietarioSegundoVehiculo || '{propietarioSegundoVehiculo}';
+  const conductorVehiculoInfractor = formData.conductorVehiculoInfractor || '{conductorVehiculoInfractor}';
+  const cedulaConductorInfractor = formData.cedulaConductorInfractor || '{cedulaConductorInfractor}';
+  const numeroPolizaSura = formData.numeroPolizaSura || '{numeroPolizaSura}';
+  const cuantia = formatCurrency(formData.cuantia);
+  return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en la ${direccionAccidente}, de la ciudad de ${ciudad}, ${departamento}; se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} de propiedad de ${propietarioPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${propietarioSegundoVehiculo} conducido por ${conductorVehiculoInfractor} identificado con cédula de ciudadanía ${cedulaConductorInfractor}
+2. Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}
+3. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
+4. Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia} por concepto de reparación de los daños materiales sufridos al vehículo de placas ${placasPrimerVehiculo}.`;
+};
+
+export const generateDocumentBlobServer = async (
+  formData: any, 
+  caseType: string, 
+  tabContents?: any
+): Promise<Blob> => {
   try {
     console.log('=== INICIO GENERACIÓN DE DOCUMENTO EN SERVIDOR ===')
     console.log('Tipo de caso:', caseType)
     console.log('Datos recibidos:', Object.keys(formData))
+    console.log('Contenido de tabs recibido:', tabContents ? Object.keys(tabContents) : 'No incluido')
     
     // Determinar qué plantilla usar basado en el tipo de caso
     let templatePath = ''
@@ -146,10 +199,11 @@ export const generateDocumentBlobServer = async (formData: any, caseType: string
       throw error
     }
 
-    // Preparar los datos para la plantilla
+    // Preparar los datos para la plantilla incluyendo contenido de tabs
     console.log('Preparando datos para plantilla...')
-    const templateData = await prepareTemplateData(formData)
+    const templateData = await prepareTemplateData(formData, tabContents)
     console.log('Datos preparados:', Object.keys(templateData))
+    console.log('Contenido de anexos para plantilla:', templateData.anexos ? 'Incluido' : 'No incluido')
     
     // Renderizar el documento
     try {

@@ -21,10 +21,29 @@ export async function mergePDFsWithAnnexes(
     // Agregar páginas del PDF principal
     console.log('Agregando páginas del PDF principal...')
     const mainPdf = await PDFDocument.load(mainPdfBuffer)
-    const mainPages = await mergedPdf.copyPages(mainPdf, mainPdf.getPageIndices())
-    
-    mainPages.forEach((page) => mergedPdf.addPage(page))
-    console.log(`Agregadas ${mainPages.length} páginas del documento principal`)
+    const mainPageIndices = mainPdf.getPageIndices();
+    let mainPagesToCopy = mainPageIndices;
+    // Si la última página está en blanco, no la agregues
+    if (mainPageIndices.length > 0) {
+      const lastPageIdx = mainPageIndices[mainPageIndices.length - 1];
+      const lastPage = await mainPdf.getPage(lastPageIdx);
+      const copiedLastPage = (await mergedPdf.copyPages(mainPdf, [lastPageIdx]))[0];
+      if (isPageBlank(copiedLastPage)) {
+        mainPagesToCopy = mainPageIndices.slice(0, -1);
+        console.log('Última página del documento principal está en blanco y será omitida.');
+      }
+    }
+    const mainPages = await mergedPdf.copyPages(mainPdf, mainPagesToCopy);
+    let addedMain = 0;
+    mainPages.forEach((page, idx) => {
+      if (!isPageBlank(page)) {
+        mergedPdf.addPage(page);
+        addedMain++;
+      } else {
+        console.log(`Página en blanco omitida del documento principal: ${idx + 1}`);
+      }
+    });
+    console.log(`Agregadas ${addedMain} páginas no en blanco del documento principal`)
 
     // Procesar cada anexo
     for (let i = 0; i < annexBuffers.length; i++) {
@@ -37,9 +56,17 @@ export async function mergePDFsWithAnnexes(
           console.log('Procesando como PDF...')
           const annexPdf = await PDFDocument.load(buffer)
           const annexPages = await mergedPdf.copyPages(annexPdf, annexPdf.getPageIndices())
-          
-          annexPages.forEach((page) => mergedPdf.addPage(page))
-          console.log(`Agregadas ${annexPages.length} páginas del anexo PDF`)
+          // Agregar solo páginas no en blanco
+          let addedAnnex = 0;
+          annexPages.forEach((page, idx) => {
+            if (!isPageBlank(page)) {
+              mergedPdf.addPage(page);
+              addedAnnex++;
+            } else {
+              console.log(`Página en blanco omitida del anexo ${filename}: ${idx + 1}`);
+            }
+          });
+          console.log(`Agregadas ${addedAnnex} páginas no en blanco del anexo PDF`)
           
         } else if (mimetype.startsWith('image/')) {
           // Si es una imagen, crear una página y agregar la imagen
@@ -229,4 +256,21 @@ export async function convertImageToPdf(imageBuffer: Buffer, mimetype: string): 
     console.error('Error convirtiendo imagen a PDF:', error)
     throw error
   }
+}
+
+// Helper para detectar si una página está en blanco (sin contenido visible)
+function isPageBlank(page: any) {
+  // pdf-lib: page.node.Contents puede ser undefined o vacío si la página está en blanco
+  // page.getContentStream() no existe, pero page.node.Contents sí
+  // Si Contents es undefined o un array vacío, la página está en blanco
+  const contents = page.node.Contents();
+  if (!contents) return true;
+  if (Array.isArray(contents) && contents.length === 0) return true;
+  // Si es un solo objeto, revisamos su tamaño
+  if (Array.isArray(contents)) {
+    return contents.every((c) => !c || (c.contents && c.contents.length === 0));
+  } else if (contents && contents.contents) {
+    return contents.contents.length === 0;
+  }
+  return false;
 }
