@@ -12,7 +12,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('=== INICIO DEL PROCESO DE ENVÍO DE EMAIL ===')
+  console.log('=== INICIO DEL PROCESO DE ENVÍO DE EMAIL CON IMÁGENES ===')
   try {
     console.log('Obteniendo FormData...')
     const formData = await request.formData()
@@ -76,20 +76,74 @@ export async function POST(request: NextRequest) {
     console.log('Extrayendo datos del formulario...')
     const documentData: any = {}
     const anexoFiles: File[] = []
+    const imageFiles: any[] = [] // Nuevo array para imágenes
+    let imageMetadata: any[] = []
     
     for (const [key, value] of formData.entries()) {
       if (key === 'anexos' && value instanceof File) {
         // Recolectar archivos anexos del step 2
         anexoFiles.push(value)
         console.log(`Anexo encontrado: ${value.name} (${value.size} bytes)`)
+      } else if (key.startsWith('imagen_') && value instanceof File) {
+        // Recolectar archivos de imágenes de la tab Hechos
+        const imageIndex = parseInt(key.replace('imagen_', ''))
+        
+        // Leer el archivo y convertir a data URL
+        const arrayBuffer = await value.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer)
+        
+        // Crear data URL base64 correcto
+        const mimeType = value.type || 'image/jpeg'
+        // Asegurar que el mimeType sea compatible con docxtemplater-image-module-free
+        const validMimeType = mimeType.includes('jpeg') ? 'image/jpg' : mimeType
+        const base64String = `data:${validMimeType};base64,${buffer.toString('base64')}`
+        
+        console.log(`Imagen ${imageIndex} procesada para email:`, {
+          name: value.name,
+          originalType: value.type,
+          processedType: validMimeType,
+          size: value.size,
+          base64Length: base64String.length
+        })
+        
+        imageFiles.push({
+          data: base64String, // Data URL completo
+          name: value.name,
+          width: 400, // Se actualizará con metadatos
+          height: 300, // Se actualizará con metadatos
+          index: imageIndex,
+          mimeType: validMimeType
+        })
+        
+      } else if (key === 'imagenesMetadata') {
+        // Obtener metadatos de las imágenes
+        try {
+          imageMetadata = JSON.parse(value as string)
+          console.log('Metadatos de imágenes para email:', imageMetadata.length)
+        } catch (error) {
+          console.error('Error parseando metadatos de imágenes:', error)
+          imageMetadata = []
+        }
       } else if (!key.startsWith('email') && key !== 'caseType') {
         documentData[key] = value
       }
     }
+
+    // Actualizar metadatos de imágenes con información correcta
+    imageFiles.forEach(imgFile => {
+      const metadata = imageMetadata.find(m => m.id === imgFile.index)
+      if (metadata) {
+        imgFile.width = metadata.width
+        imgFile.height = metadata.height
+        imgFile.name = metadata.name
+        console.log(`Metadatos aplicados a imagen ${imgFile.index} para email: ${metadata.width}x${metadata.height}`)
+      }
+    })
     
     console.log('Datos extraídos para documento:', {
       keys: Object.keys(documentData),
       anexosCount: anexoFiles.length,
+      imagenesCount: imageFiles.length, // Nueva información
       caseType,
       sampleData: {
         nombreEmpresa: documentData.nombreEmpresa,
@@ -98,17 +152,17 @@ export async function POST(request: NextRequest) {
       }
     })
     
-    console.log('Generando documento Word para email...')
+    console.log('Generando documento Word para email con imágenes...')
     
-    // Generar documento Word
+    // Generar documento Word con imágenes
     let documentBlob: Blob
     try {
-      documentBlob = await generateDocumentBlob(documentData, caseType)
-      console.log('Documento generado exitosamente')
+      documentBlob = await generateDocumentBlob(documentData, caseType, undefined, imageFiles)
+      console.log('Documento generado exitosamente con imágenes para email')
     } catch (error) {
       console.error('Error generando documento:', error)
       return NextResponse.json(
-        { success: false, error: 'Error al generar el documento' },
+        { success: false, error: 'Error al generar el documento con imágenes' },
         { status: 500 }
       )
     }
@@ -172,19 +226,27 @@ export async function POST(request: NextRequest) {
           console.log('Iniciando merge de PDF principal con anexos...')
           const mergedPdfBuffer = await mergePDFsWithAnnexes(documentBuffer, annexBuffers)
           
+          const filename = imageFiles.length > 0 
+            ? `${caseType.replace(/\s+/g, '_')}_${fecha}_COMPLETO_CON_IMAGENES.pdf`
+            : `${caseType.replace(/\s+/g, '_')}_${fecha}_COMPLETO.pdf`
+          
           attachments.push({
-            filename: `${caseType.replace(/\s+/g, '_')}_${fecha}_COMPLETO.pdf`,
+            filename: filename,
             content: mergedPdfBuffer,
             contentType: 'application/pdf'
           })
-          console.log('PDF combinado creado exitosamente')
+          console.log('PDF combinado creado exitosamente con imágenes incluidas')
           
         } catch (mergeError) {
           console.error('Error en el merge, enviando archivos por separado:', mergeError)
           
           // Si falla el merge, enviar archivos por separado
+          const filename = imageFiles.length > 0
+            ? `${caseType.replace(/\s+/g, '_')}_${fecha}_CON_IMAGENES.pdf`
+            : `${caseType.replace(/\s+/g, '_')}_${fecha}.pdf`
+          
           attachments.push({
-            filename: `${caseType.replace(/\s+/g, '_')}_${fecha}.pdf`,
+            filename: filename,
             content: documentBuffer,
             contentType: 'application/pdf'
           })
@@ -214,12 +276,16 @@ export async function POST(request: NextRequest) {
         const fileExtension = isPDF ? 'pdf' : 'docx'
         const contentType = isPDF ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         
+        const filename = imageFiles.length > 0
+          ? `${caseType.replace(/\s+/g, '_')}_${fecha}_CON_IMAGENES.${fileExtension}`
+          : `${caseType.replace(/\s+/g, '_')}_${fecha}.${fileExtension}`
+        
         attachments.push({
-          filename: `${caseType.replace(/\s+/g, '_')}_${fecha}.${fileExtension}`,
+          filename: filename,
           content: documentBuffer,
           contentType: contentType
         })
-        console.log(`Documento ${fileExtension.toUpperCase()} añadido como anexo`)
+        console.log(`Documento ${fileExtension.toUpperCase()} con imágenes añadido como anexo`)
         
         // Añadir anexos del step 2 por separado si existen
         if (anexoFiles.length > 0) {
@@ -258,6 +324,12 @@ export async function POST(request: NextRequest) {
     
     console.log(`Total de anexos preparados: ${attachments.length}`)
 
+    // Agregar información sobre imágenes al mensaje del email si hay imágenes
+    let emailMessageWithImages = emailMessage
+    if (imageFiles.length > 0) {
+      emailMessageWithImages += `\n\n---\n\nEste documento incluye ${imageFiles.length} imagen(es) de evidencia fotográfica integrada(s) en el archivo adjunto.`
+    }
+
     // Configurar el contenido del email
     const mailOptions = {
       from: process.env.SMTP_FROM || 'subrogacion10@btlegalgroup.com',
@@ -265,7 +337,13 @@ export async function POST(request: NextRequest) {
       subject: emailSubject,
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-          ${emailMessage.replace(/\n/g, '<br>')}
+          ${emailMessageWithImages.replace(/\n/g, '<br>')}
+          
+          ${imageFiles.length > 0 ? `
+          <div style="margin-top: 20px; padding: 10px; background-color: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px;">
+            <strong>📷 Evidencia Fotográfica:</strong> Este documento incluye ${imageFiles.length} imagen(es) integrada(s) como evidencia del siniestro.
+          </div>
+          ` : ''}
           
           <div style="margin-top: 30px;">
             <img src="cid:logo" alt="BTL Legal Group" style="max-width: 150px; height: auto;" />
@@ -294,7 +372,8 @@ export async function POST(request: NextRequest) {
       from: mailOptions.from,
       to: mailOptions.to,
       subject: mailOptions.subject,
-      attachmentsCount: mailOptions.attachments.length
+      attachmentsCount: mailOptions.attachments.length,
+      imagenesIncluidas: imageFiles.length
     })
 
     // Verificar conexión SMTP antes de enviar
@@ -311,7 +390,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Enviar el correo
-    console.log('Enviando correo electrónico...')
+    console.log('Enviando correo electrónico con imágenes...')
     let info
     try {
       info = await transporter.sendMail(mailOptions)
@@ -340,23 +419,28 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    console.log('=== RESPUESTA EXITOSA ===')
+    console.log('=== RESPUESTA EXITOSA CON IMÁGENES ===')
     
     // Determinar si se hizo merge o se enviaron archivos separados
-    const mergedFile = attachments.find(att => att.filename.includes('_COMPLETO.pdf'))
+    const mergedFile = attachments.find(att => att.filename.includes('_COMPLETO'))
     const hasMergedPDF = !!mergedFile
+    const hasImages = imageFiles.length > 0
     
     const successResponse = { 
       success: true, 
-      message: 'Correo enviado exitosamente',
+      message: 'Correo enviado exitosamente con imágenes',
       messageId: info.messageId,
       recipients: emailRecipients.length,
       attachments: {
         total: attachments.length,
         merged: hasMergedPDF,
-        description: hasMergedPDF 
-          ? `PDF combinado con ${anexoFiles.length} anexos integrados`
-          : `${attachments.length} archivos adjuntos (documento principal + ${anexoFiles.length} anexos)`
+        images: hasImages ? imageFiles.length : 0,
+        description: hasImages 
+          ? `Documento con ${imageFiles.length} imagen(es) integrada(s)` + 
+            (hasMergedPDF ? ` + PDF combinado con ${anexoFiles.length} anexos` : ` + ${anexoFiles.length} anexos separados`)
+          : hasMergedPDF 
+            ? `PDF combinado con ${anexoFiles.length} anexos integrados`
+            : `${attachments.length} archivos adjuntos (documento principal + ${anexoFiles.length} anexos)`
       }
     }
     console.log('Respuesta exitosa:', successResponse)
