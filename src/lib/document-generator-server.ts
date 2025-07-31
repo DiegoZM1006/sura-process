@@ -91,34 +91,53 @@ const prepareTemplateData = async (formData: any, tabContents?: any, imageFiles?
   const hechosContent = tabContents?.hechos || formData.contenidoHechos || getDefaultHechosContent(formData);
 
   // Preparar datos de imágenes para docxtemplater
-  let imagenesHechos: string | null = null // Cambiar a string único, no array
+  let imagenesHechos: any[] = [] // Cambiar de vuelta a array para múltiples imágenes
   
   if (imageFiles && imageFiles.length > 0) {
-    console.log('Procesando imágenes para plantilla:', imageFiles.length)
+    console.log('Procesando múltiples imágenes para plantilla:', imageFiles.length)
     
-    // Tomar solo la primera imagen para {%imagenesHechos}
-    const firstImageFile = imageFiles[0]
-    
-    try {
-      console.log('Procesando primera imagen:', {
-        name: firstImageFile.name,
-        width: firstImageFile.width,
-        height: firstImageFile.height,
-        hasData: !!firstImageFile.data,
-        dataType: typeof firstImageFile.data
-      })
-      
-      // Para docxtemplater-image-module-free, necesitamos solo el data URL string
-      if (firstImageFile.data && typeof firstImageFile.data === 'string' && firstImageFile.data.startsWith('data:image')) {
-        imagenesHechos = firstImageFile.data
-        console.log('Imagen preparada como data URL para {%imagenesHechos}')
-        console.log('Data URL preview:', imagenesHechos.substring(0, 50) + '...')
-      } else {
-        console.error('Primera imagen no tiene data URL válido')
+    imagenesHechos = imageFiles.map((imgFile, index) => {
+      try {
+        console.log(`Procesando imagen ${index}:`, {
+          name: imgFile.name,
+          width: imgFile.width,
+          height: imgFile.height,
+          hasData: !!imgFile.data,
+          dataType: typeof imgFile.data
+        })
+        
+        // Para la sintaxis {#imagenesHechos}{%src}{/imagenesHechos}
+        // Necesitamos objetos con propiedad 'src'
+        if (imgFile.data && typeof imgFile.data === 'string' && imgFile.data.startsWith('data:image')) {
+          const imageObj = {
+            src: imgFile.data, // La propiedad 'src' que usará {%src}
+            width: imgFile.width || 400,
+            height: imgFile.height || 300,
+            name: imgFile.name || `imagen_${index}`,
+            index: index
+          }
+          
+          console.log(`Imagen ${index} preparada con propiedad 'src'`)
+          return imageObj
+        }
+        
+        console.error(`Imagen ${index} no tiene data URL válido`)
+        return null
+        
+      } catch (error) {
+        console.error(`Error procesando imagen ${index}:`, error)
+        return null
       }
-      
-    } catch (error) {
-      console.error('Error procesando primera imagen:', error)
+    }).filter(img => img !== null)
+    
+    console.log('Imágenes procesadas para plantilla:', imagenesHechos.length)
+    if (imagenesHechos.length > 0) {
+      console.log('Primera imagen objeto:', {
+        hasSrc: !!imagenesHechos[0].src,
+        width: imagenesHechos[0].width,
+        height: imagenesHechos[0].height,
+        srcPreview: imagenesHechos[0].src ? imagenesHechos[0].src.substring(0, 50) + '...' : 'No src'
+      })
     }
   } else {
     console.log('No hay imágenes para procesar')
@@ -177,7 +196,7 @@ const prepareTemplateData = async (formData: any, tabContents?: any, imageFiles?
 
   console.log('Template data preparado:', {
     ...templateData,
-    imagenesHechos: imagenesHechos ? 'Data URL presente' : 'No hay imagen'
+    imagenesHechos: imagenesHechos.length > 0 ? `${imagenesHechos.length} imágenes con propiedad src` : 'No hay imágenes'
   })
 
   return templateData
@@ -278,9 +297,9 @@ export const generateDocumentBlobServer = async (
       getImage(tag: any) {
         console.log('getImage llamado con tag:', typeof tag, tag ? tag.substring(0, 50) + '...' : 'undefined');
         
-        // Para {%imagenesHechos}, tag será directamente el data URL string
+        // Para {#imagenesHechos}{%src}{/imagenesHechos}, tag será el valor de 'src'
         if (typeof tag === 'string' && tag.startsWith('data:image')) {
-          console.log('Procesando data URL para {%imagenesHechos}');
+          console.log('Procesando data URL desde propiedad src');
           const result = base64DataURLToArrayBuffer(tag);
           console.log('Resultado de conversión:', result ? 'ArrayBuffer generado' : 'Falló la conversión');
           return result;
@@ -289,10 +308,17 @@ export const generateDocumentBlobServer = async (
         console.log('Tag no es un data URL válido:', typeof tag);
         return false;
       },
-      getSize() {
-        // Para {%imagenesHechos}, usamos tamaño fijo por ahora
-        // TODO: Implementar tamaño dinámico basado en metadatos si es necesario
-        console.log('getSize llamado, usando tamaño por defecto: 400x300');
+      getSize(img: any, tagValue: any, tagName: string) {
+        console.log('getSize llamado para tagName:', tagName, 'tagValue type:', typeof tagValue);
+        
+        // Para {%src}, tagValue será el objeto completo de la imagen
+        if (tagValue && typeof tagValue === 'object' && tagValue.width && tagValue.height) {
+          console.log('Usando dimensiones del objeto imagen:', tagValue.width, 'x', tagValue.height);
+          return [tagValue.width, tagValue.height];
+        }
+        
+        // Dimensiones por defecto
+        console.log('Usando dimensiones por defecto: 400x300');
         return [400, 300];
       },
     };
@@ -324,9 +350,16 @@ export const generateDocumentBlobServer = async (
     console.log('Template data final que se enviará a docxtemplater:')
     Object.keys(templateData).forEach(key => {
       if (key === 'imagenesHechos') {
-        console.log(`  ${key}:`, templateData[key] ? `Data URL (${templateData[key].length} chars)` : 'null')
-        if (templateData[key]) {
-          console.log(`    Preview: ${templateData[key].substring(0, 100)}...`)
+        console.log(`  ${key}:`, Array.isArray(templateData[key]) ? `Array con ${templateData[key].length} elementos` : 'No es array')
+        if (Array.isArray(templateData[key]) && templateData[key].length > 0) {
+          templateData[key].forEach((img, idx) => {
+            console.log(`    Imagen ${idx}:`, {
+              hasSrc: !!img.src,
+              width: img.width,
+              height: img.height,
+              srcPreview: img.src ? img.src.substring(0, 50) + '...' : 'No src'
+            })
+          })
         }
       } else {
         console.log(`  ${key}:`, typeof templateData[key] === 'string' ? templateData[key].substring(0, 50) + '...' : templateData[key])
@@ -335,8 +368,9 @@ export const generateDocumentBlobServer = async (
     
     // Renderizar el documento
     try {
-      console.log('Renderizando documento con imagen única...')
-      console.log('imagenesHechos es:', typeof templateData.imagenesHechos, templateData.imagenesHechos ? 'tiene valor' : 'es null/undefined')
+      console.log('Renderizando documento con múltiples imágenes...')
+      console.log('imagenesHechos es array:', Array.isArray(templateData.imagenesHechos))
+      console.log('imagenesHechos length:', templateData.imagenesHechos ? templateData.imagenesHechos.length : 'undefined')
       doc.render(templateData)
       console.log('Documento renderizado exitosamente')
     } catch (renderError) {
@@ -345,7 +379,8 @@ export const generateDocumentBlobServer = async (
         message: renderError.message,
         stack: renderError.stack,
         templateDataKeys: Object.keys(templateData),
-        imagenesHechosValue: templateData.imagenesHechos ? 'presente' : 'ausente'
+        imagenesHechosType: typeof templateData.imagenesHechos,
+        imagenesHechosLength: Array.isArray(templateData.imagenesHechos) ? templateData.imagenesHechos.length : 'No es array'
       })
       throw new Error(`Error al renderizar documento: ${renderError instanceof Error ? renderError.message : 'Error desconocido'}`)
     }
