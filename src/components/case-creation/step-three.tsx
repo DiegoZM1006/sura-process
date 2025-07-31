@@ -14,6 +14,7 @@ interface StepThreeProps {
   currentStep: number
   caseType?: string
   formData?: any
+  documentImages?: any[] // Nueva prop para las imágenes
 }
 
 interface EmailData {
@@ -23,16 +24,23 @@ interface EmailData {
   nombreEmpresa: string
 }
 
-export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formData }: StepThreeProps) {
+export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formData, documentImages = [] }: StepThreeProps) {
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isDownloadingWord, setIsDownloadingWord] = useState(false)
+  const [currentDocumentImages, setCurrentDocumentImages] = useState<any[]>(documentImages)
   // Estado para los contenidos de los tabs, inicializando anexos con valor por defecto
   const [tabContents, setTabContents] = useState<{ anexos: string; hechos?: string }>({ anexos: getDefaultAnexosContent(formData) })
 
   // Handler para cambios en los tabs del editor
   const handleTabContentChange = (tabId: string, content: string) => {
     setTabContents(prev => ({ ...prev, [tabId]: content }))
+  }
+
+  // Handler para cambios en las imágenes
+  const handleImagesChange = (images: any[]) => {
+    setCurrentDocumentImages(images)
+    console.log('Imágenes actualizadas en Step 3:', images.length)
   }
 
   const handleDownloadWord = async () => {
@@ -60,6 +68,28 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
       // Agregar el contenido de hechos como 'contenidoHechos'
       if (tabContents.hechos) {
         formDataForDownload.append('contenidoHechos', String(tabContents.hechos))
+      }
+
+      // Agregar las imágenes de la tab Hechos
+      if (currentDocumentImages && currentDocumentImages.length > 0) {
+        console.log('Agregando imágenes al FormData:', currentDocumentImages.length)
+        
+        // Agregar metadatos de las imágenes
+        const imageMetadata = currentDocumentImages.map(img => ({
+          id: img.id,
+          name: img.name,
+          width: img.width,
+          height: img.height
+        }))
+        formDataForDownload.append('imagenesMetadata', JSON.stringify(imageMetadata))
+        
+        // Agregar cada archivo de imagen
+        currentDocumentImages.forEach((img, index) => {
+          if (img.file) {
+            formDataForDownload.append(`imagen_${index}`, img.file, img.name)
+            console.log(`Imagen ${index} agregada: ${img.name}`)
+          }
+        })
       }
       
       // Agregar tipo de caso
@@ -135,6 +165,27 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
       // Agregar el contenido de hechos como 'contenidoHechos'
       if (tabContents.hechos) {
         formDataWithEmail.append('contenidoHechos', String(tabContents.hechos))
+      }
+
+      // Agregar las imágenes de la tab Hechos
+      if (currentDocumentImages && currentDocumentImages.length > 0) {
+        console.log('Agregando imágenes al email:', currentDocumentImages.length)
+        
+        // Agregar metadatos de las imágenes
+        const imageMetadata = currentDocumentImages.map(img => ({
+          id: img.id,
+          name: img.name,
+          width: img.width,
+          height: img.height
+        }))
+        formDataWithEmail.append('imagenesMetadata', JSON.stringify(imageMetadata))
+        
+        // Agregar cada archivo de imagen
+        currentDocumentImages.forEach((img, index) => {
+          if (img.file) {
+            formDataWithEmail.append(`imagen_${index}`, img.file, img.name)
+          }
+        })
       }
       
       // Agregar datos del email
@@ -223,7 +274,7 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
               ) : (
                 <>
                   <Download className="h-4 w-4" />
-                  Descargar con Anexos
+                  Descargar con Anexos e Imágenes
                 </>
               )}
             </Button>
@@ -234,9 +285,12 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
         <div className="mt-3 text-sm text-gray-600">
           <p><strong>Tipo:</strong> {caseType}</p>
           <p><strong>Estado:</strong> Listo para envío</p>
-          <p><strong>Formato:</strong> PDF con anexos incluidos</p>
+          <p><strong>Formato:</strong> PDF con anexos e imágenes incluidos</p>
           {formData?.anexos && formData.anexos.length > 0 && (
             <p><strong>Anexos:</strong> {formData.anexos.length} archivo(s)</p>
+          )}
+          {currentDocumentImages && currentDocumentImages.length > 0 && (
+            <p><strong>Imágenes:</strong> {currentDocumentImages.length} imagen(es) en Hechos</p>
           )}
         </div>
       </div>
@@ -248,6 +302,7 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
           caseType={caseType}
           tabContents={tabContents}
           onTabContentChange={handleTabContentChange}
+          onImagesChange={handleImagesChange}
         />
       </div>
 

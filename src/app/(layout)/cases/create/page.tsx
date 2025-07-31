@@ -19,6 +19,7 @@ export default function CreateCasePage() {
     const searchParams = useSearchParams()
     const [currentStep, setCurrentStep] = useState(1)
     const [caseType, setCaseType] = useState<string>("")
+    const [documentImages, setDocumentImages] = useState<any[]>([]) // Nuevo estado para imágenes
     const [steps, setSteps] = useState([
         { id: 1, name: "Información Básica", status: "current" },
         { id: 2, name: "Anexos", status: "upcoming" },
@@ -40,6 +41,7 @@ export default function CreateCasePage() {
         propietarioPrimerVehiculo: "",
         placasSegundoVehiculo: "",
         propietarioSegundoVehiculo: "",
+        afiliador: "",
         conductorVehiculoInfractor: "",
         cedulaConductorInfractor: "",
         numeroPolizaSura: "",
@@ -57,6 +59,12 @@ export default function CreateCasePage() {
 
     const handleInputChange = (field: string, value: string | string[]) => {
         setFormData(prev => ({ ...prev, [field]: typeof value === 'string' ? value : (Array.isArray(value) ? value.join(', ') : '') }))
+    }
+
+    // Handler para cambios en las imágenes
+    const handleImagesChange = (images: any[]) => {
+        setDocumentImages(images)
+        console.log('Imágenes actualizadas:', images.length)
     }
 
     const nextStep = () => {
@@ -104,6 +112,7 @@ export default function CreateCasePage() {
 
     const handleFinish = () => {
         console.log('Caso finalizado exitosamente:', formData)
+        console.log('Imágenes del documento:', documentImages.length)
         // Aquí iría la lógica para guardar el caso en la base de datos
         // Por ejemplo, redirigir a la lista de casos
         alert('Caso creado y enviado exitosamente!')
@@ -139,6 +148,7 @@ export default function CreateCasePage() {
                         currentStep={currentStep}
                         caseType={caseType}
                         formData={formData}
+                        documentImages={documentImages} // Pasar imágenes al Step 3
                     />
                 )
             default:
@@ -216,6 +226,7 @@ export default function CreateCasePage() {
                                     <TiptapEditor 
                                         formData={formData} 
                                         caseType={caseType}
+                                        onImagesChange={handleImagesChange} // Pasar callback de imágenes
                                     />
                                 </div>
                                 <EditorFooter

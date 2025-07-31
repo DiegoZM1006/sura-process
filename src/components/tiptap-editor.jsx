@@ -13,9 +13,10 @@ import React, { useState, useEffect } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { RefreshCw } from 'lucide-react'
 
-const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabContentChange }) => {
+const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabContentChange, onImagesChange }) => {
   const [activeTab, setActiveTab] = useState("informacion-empresa");
   const [forceRegenerate, setForceRegenerate] = useState(0);
+  const [images, setImages] = useState([]);
 
   const handleRegenerateContent = () => {
     if (onTabContentChange) {
@@ -29,6 +30,72 @@ const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabCon
     if (onTabContentChange) {
       onTabContentChange(tabId, content);
     }
+  };
+
+  // Función para manejar la subida de imágenes
+  const handleImageUpload = (event) => {
+    const files = Array.from(event.target.files);
+    
+    files.forEach((file) => {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const imageData = {
+            id: Date.now() + Math.random(), // ID único
+            name: file.name,
+            data: e.target.result, // Base64 data URL (data:image/...;base64,...)
+            file: file, // Archivo original para docxtemplater
+            width: 100, // Ancho por defecto
+            height: 300 // Alto por defecto
+          };
+          
+          console.log('Nueva imagen agregada:', {
+            name: imageData.name,
+            dataLength: imageData.data.length,
+            dataPreview: imageData.data.substring(0, 50) + '...'
+          });
+          
+          setImages(prev => {
+            const newImages = [...prev, imageData];
+            // Notificar al componente padre sobre los cambios
+            if (onImagesChange) {
+              onImagesChange(newImages);
+            }
+            return newImages;
+          });
+        };
+        reader.readAsDataURL(file); // Esto genera data:image/...;base64,...
+      }
+    });
+    
+    // Limpiar el input
+    event.target.value = '';
+  };
+
+  // Función para eliminar una imagen
+  const handleRemoveImage = (imageId) => {
+    setImages(prev => {
+      const newImages = prev.filter(img => img.id !== imageId);
+      if (onImagesChange) {
+        onImagesChange(newImages);
+      }
+      return newImages;
+    });
+  };
+
+  // Función para actualizar dimensiones de imagen
+  const handleImageDimensionChange = (imageId, dimension, value) => {
+    setImages(prev => {
+      const newImages = prev.map(img => 
+        img.id === imageId 
+          ? { ...img, [dimension]: parseInt(value) || 0 }
+          : img
+      );
+      if (onImagesChange) {
+        onImagesChange(newImages);
+      }
+      return newImages;
+    });
   };
 
   const tabs = [
@@ -99,7 +166,7 @@ const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabCon
                 // Editor editable con textarea
                 <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden flex-1 flex flex-col">
                   {/* Toolbar */}
-                  <div className="bg-white border-b border-gray-200 p-3">
+                  <div className="bg-white border-b border-gray-200 p-3 flex justify-between items-center">
                     <button
                       onClick={handleRegenerateContent}
                       className="inline-flex items-center justify-center w-8 h-8 rounded-md transition-all duration-200 border border-gray-200 hover:bg-gray-100 text-gray-600 hover:border-gray-300"
@@ -107,19 +174,102 @@ const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabCon
                     >
                       <RefreshCw size={14} />
                     </button>
+                    
+                    {/* Botón para subir imágenes solo en la tab de Hechos */}
+                    {tab.id === 'hechos' && (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleImageUpload}
+                          className="hidden"
+                          id="image-upload"
+                        />
+                        <label
+                          htmlFor="image-upload"
+                          className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50 cursor-pointer transition-colors"
+                        >
+                          📷 Subir Imágenes
+                        </label>
+                      </div>
+                    )}
                   </div>
                   
-                  {/* Textarea */}
-                  <textarea
-                    value={getTabContent(tab.id)}
-                    onChange={(e) => handleTabContentChange(tab.id, e.target.value)}
-                    className="flex-1 p-6 resize-none border-none outline-none font-sans text-sm leading-relaxed text-gray-800"
-                    placeholder={`Escriba el contenido para ${tab.label}...`}
-                    style={{
-                      minHeight: '500px',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                    }}
-                  />
+                  {/* Contenedor principal con textarea y panel de imágenes */}
+                  <div className="flex-1 flex">
+                    {/* Textarea */}
+                    <textarea
+                      value={getTabContent(tab.id)}
+                      onChange={(e) => handleTabContentChange(tab.id, e.target.value)}
+                      className="flex-1 p-6 resize-none border-none outline-none font-sans text-sm leading-relaxed text-gray-800"
+                      placeholder={`Escriba el contenido para ${tab.label}...`}
+                      style={{
+                        minHeight: '500px',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                      }}
+                    />
+                    
+                    {/* Panel de imágenes solo para la tab de Hechos */}
+                    {tab.id === 'hechos' && images.length > 0 && (
+                      <div className="w-80 border-l border-gray-200 bg-gray-50 p-4 overflow-y-auto">
+                        <h3 className="text-sm font-medium text-gray-900 mb-3">Imágenes ({images.length})</h3>
+                        <div className="space-y-4">
+                          {images.map((image) => (
+                            <div key={image.id} className="bg-white rounded-lg border border-gray-200 p-3">
+                              {/* Preview de la imagen */}
+                              <div className="mb-2">
+                                <img
+                                  src={image.data}
+                                  alt={image.name}
+                                  className="w-full h-32 object-cover rounded border"
+                                />
+                              </div>
+                              
+                              {/* Nombre del archivo */}
+                              <p className="text-xs text-gray-600 mb-2 truncate" title={image.name}>
+                                {image.name}
+                              </p>
+                              
+                              {/* Controles de dimensiones */}
+                              {/* <div className="grid grid-cols-2 gap-2 mb-2">
+                                <div>
+                                  <label className="text-xs text-gray-500">Ancho</label>
+                                  <input
+                                    type="number"
+                                    value={image.width}
+                                    onChange={(e) => handleImageDimensionChange(image.id, 'width', e.target.value)}
+                                    className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                                    min="50"
+                                    max="800"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-xs text-gray-500">Alto</label>
+                                  <input
+                                    type="number"
+                                    value={image.height}
+                                    onChange={(e) => handleImageDimensionChange(image.id, 'height', e.target.value)}
+                                    className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                                    min="50"
+                                    max="600"
+                                  />
+                                </div>
+                              </div> */}
+                              
+                              {/* Botón para eliminar */}
+                              <button
+                                onClick={() => handleRemoveImage(image.id)}
+                                className="w-full px-2 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors"
+                              >
+                                Eliminar
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -180,7 +330,7 @@ const generateFundamentosContent = (formData = {}) => {
   const placasPrimerVehiculo = formData.placasPrimerVehiculo || '{placasPrimerVehiculo}';
   const placasSegundoVehiculo = formData.placasSegundoVehiculo || '{placasSegundoVehiculo}';
   const cuantia = formatCurrency(formData.cuantia);
-  return `La subrogación  \n\nLas entidades aseguradoras se ven obligadas al pago de las indemnizaciones que hayan sido pactadas en el contrato de seguro. No obstante, el Código de Comercio establece la posibilidad que asiste a la aseguradora de realizar el recobro de este pago a quien haya sido responsable del daño resarcido: “El asegurador que pague una indemnización se subrogará, por ministerio de la ley y hasta concurrencia de su importe, en los derechos del asegurado contra las personas responsables del siniestro.”[ Código Comercial Colombiano (CCo) Decreto 410 de 1971. Artículo 1096. Marzo 27 de 1971 (Colombia).]\n\nLa Corte Suprema de Justicia ha desarrollado esta disposición legal de la siguiente manera:\n\nLa citada disposición permite establecer, que para el buen suceso de la «acción subrogatoria», se debe acreditar que en virtud de un «contrato de seguro», al haberse producido el «siniestro», el asegurador efectuó válidamente el «pago de la indemnización», de tal manera que por mandato legal se subroga en los derechos del afectado patrimonialmente con el riesgo amparado, pasando a ocupar su lugar o posición en la relación jurídica existente con el responsable o causante del hecho dañoso.[ Corte Suprema de Justicia. Sala de Casación Civil. Sentencia SC 003-2015. (M. P. Jesús Vall de Rutén; 14 de enero de 2015).]\nEn consecuencia, a Seguros Generales Sura S.A. le asiste el derecho a recobrar el valor pagado por la reparación del vehículo asegurado, en virtud de la figura de la subrogación, tanto frente al propietario como frente a la empresa de servicio público por cumplirse los presupuestos jurisprudenciales:\n\na. Existe un contrato de seguro de autos soportado mediante la póliza ${numeroPoliza}.\nb. Se produjo un accidente de tránsito entre el vehículo de placa ${placasPrimerVehiculo} y el vehículo de placa ${placasSegundoVehiculo}, en el cual ha sido atribuida la responsabilidad al vehículo de su propiedad.\nc. Seguros Generales Sura S.A. canceló el valor de la reparación del vehículo de placas $ ${cuantia}.\n\nResponsabilidad Civil Extracontractual por Actividades Peligrosas  \n\nEl artículo 2341 del Código Civil establece que quien cometa un delito o culpa, y con ello le genere un daño a otro, se encuentra obligado a indemnizarlo, sin perjuicio de la pena principal que la ley imponga por la culpa o el delito cometido.\nEn lo que respecta puntualmente a la responsabilidad civil extracontractual por actividades peligrosas, esta se origina en el ejercicio de una actividad que genera un riesgo mayor al que normalmente están expuestas las personas. Al respecto, la jurisprudencia de la Sala Civil de la Corte Suprema de Justicia ha definido en forma pacífica que la conducción de vehículos automotores es una actividad considerada como peligrosa. Lo anterior, debido al alto nivel de riesgo que implica su ejercicio.\nAhora bien, en concordancia con el desarrollo jurisprudencial colombiano, con base en artículos como el 2356 (presunción de culpa en actividades peligrosas), 2347 y 2349 del Código civil (Responsabilidad indirecta por el hecho de empleado o personas a cargo) se establece todo un régimen de responsabilidad aplicado no solo a la persona principal que ejerce el hecho dañoso sino a terceros que tienen un deber de guarda o dominio y son solidariamente responsables en casos específicos.\nDe esta forma, La Corte Suprema de Justicia, en la Sentencia del 13 de marzo de 2008 (Exp. 9327), reafirmó que la responsabilidad en casos de actividades peligrosas, recae sobre quien ostenta la condición de guardián, es decir, quien detenta el poder de mando, dirección y control sobre la actividad en el momento en que ocurre el daño.\nAsimismo, según la doctrina establecida en la Sentencia del 22 de abril de 1997 (Exp. 5743), la responsabilidad no se desplaza automáticamente con la venta del vehículo o la externalización de la actividad, si la empresa continúa obteniendo un beneficio económico de la misma. Ahora bien pese a no ser la propietaria directa del vehículo involucrado en el siniestro o la actividad principal de la empresa no sea el transporte, mantiene un claro vínculo económico con la actividad que generó el daño, toda vez que, asi la entidad no tenga como actividad principal el transporte, utiliza vehículos en sus operaciones y sigue obteniendo beneficios de esta actividad, generando así la actividad peligrosa. Este vínculo económico no la exime de responsabilidad, ya que, conforme a la doctrina expuesta por la Corte Suprema, la simple transferencia de la propiedad o la tercerización de la actividad no desplaza automáticamente la responsabilidad civil, si la empresa responsable sigue beneficiándose de la operación que ocasionó el perjuicio.\nEn conclusión, en el contexto de la responsabilidad civil extracontractual en Colombia, tanto la jurisprudencia de la Corte Suprema como la normativa vigente establecen que la responsabilidad por daños en actividades peligrosas recae sobre quienes detentan el control, dirección y obtienen un beneficio económico de la actividad, independientemente de la propiedad directa de los bienes involucrados. Las empresas que conservan influencia y provecho económico en actividades riesgosas, como la operación de vehículos  pueden ser solidariamente responsables por los daños causados, debiendo responder por ellos.\n\nLa responsabilidad de la empresa de transportes  \n\nLa afiliación de vehículos automotores a una empresa prestadora del servicio público de transporte conlleva una serie de responsabilidades de carácter legal, establecidas en la Ley 336 de 1996. El artículo 36 de esta norma establece: “Los conductores de los equipos destinados al servicio público de transporte serán contratados directamente por la empresa operadora de transporte, quien para todos los efectos será solidariamente responsable junto con el propietario del equipo.”[ Ley 336 de 1996. Por la cual se adopta el estatuto nacional de transporte. Diciembre 20 de 1996.]\n\nLa responsabilidad solidaria planteada en estos términos implica que la empresa de transporte deberá responder por los créditos en cabeza de cualquiera de sus conductores, derivados de la ejecución de la actividad de transporte. Por lo tanto, este fundamento legal activa la posibilidad de efectuar el cobro directo a la empresa de transporte cuando los perjuicios ocasionados a un tercero sean producto de la responsabilidad de uno de sus vehículos afiliados. Por lo tanto, solicitamos de manera respetuosa que se acojan a nuestras pretensiones.`;
+  return `La subrogación  \n\nLas entidades aseguradoras se ven obligadas al pago de las indemnizaciones que hayan sido pactadas en el contrato de seguro. No obstante, el Código de Comercio establece la posibilidad que asiste a la aseguradora de realizar el recobro de este pago a quien haya sido responsable del daño resarcido: "El asegurador que pague una indemnización se subrogará, por ministerio de la ley y hasta concurrencia de su importe, en los derechos del asegurado contra las personas responsables del siniestro."[ Código Comercial Colombiano (CCo) Decreto 410 de 1971. Artículo 1096. Marzo 27 de 1971 (Colombia).]\n\nLa Corte Suprema de Justicia ha desarrollado esta disposición legal de la siguiente manera:\n\nLa citada disposición permite establecer, que para el buen suceso de la «acción subrogatoria», se debe acreditar que en virtud de un «contrato de seguro», al haberse producido el «siniestro», el asegurador efectuó válidamente el «pago de la indemnización», de tal manera que por mandato legal se subroga en los derechos del afectado patrimonialmente con el riesgo amparado, pasando a ocupar su lugar o posición en la relación jurídica existente con el responsable o causante del hecho dañoso.[ Corte Suprema de Justicia. Sala de Casación Civil. Sentencia SC 003-2015. (M. P. Jesús Vall de Rutén; 14 de enero de 2015).]\nEn consecuencia, a Seguros Generales Sura S.A. le asiste el derecho a recobrar el valor pagado por la reparación del vehículo asegurado, en virtud de la figura de la subrogación, tanto frente al propietario como frente a la empresa de servicio público por cumplirse los presupuestos jurisprudenciales:\n\na. Existe un contrato de seguro de autos soportado mediante la póliza ${numeroPoliza}.\nb. Se produjo un accidente de tránsito entre el vehículo de placa ${placasPrimerVehiculo} y el vehículo de placa ${placasSegundoVehiculo}, en el cual ha sido atribuida la responsabilidad al vehículo de su propiedad.\nc. Seguros Generales Sura S.A. canceló el valor de la reparación del vehículo de placas $ ${cuantia}.\n\nResponsabilidad Civil Extracontractual por Actividades Peligrosas  \n\nEl artículo 2341 del Código Civil establece que quien cometa un delito o culpa, y con ello le genere un daño a otro, se encuentra obligado a indemnizarlo, sin perjuicio de la pena principal que la ley imponga por la culpa o el delito cometido.\nEn lo que respecta puntualmente a la responsabilidad civil extracontractual por actividades peligrosas, esta se origina en el ejercicio de una actividad que genera un riesgo mayor al que normalmente están expuestas las personas. Al respecto, la jurisprudencia de la Sala Civil de la Corte Suprema de Justicia ha definido en forma pacífica que la conducción de vehículos automotores es una actividad considerada como peligrosa. Lo anterior, debido al alto nivel de riesgo que implica su ejercicio.\nAhora bien, en concordancia con el desarrollo jurisprudencial colombiano, con base en artículos como el 2356 (presunción de culpa en actividades peligrosas), 2347 y 2349 del Código civil (Responsabilidad indirecta por el hecho de empleado o personas a cargo) se establece todo un régimen de responsabilidad aplicado no solo a la persona principal que ejerce el hecho dañoso sino a terceros que tienen un deber de guarda o dominio y son solidariamente responsables en casos específicos.\nDe esta forma, La Corte Suprema de Justicia, en la Sentencia del 13 de marzo de 2008 (Exp. 9327), reafirmó que la responsabilidad en casos de actividades peligrosas, recae sobre quien ostenta la condición de guardián, es decir, quien detenta el poder de mando, dirección y control sobre la actividad en el momento en que ocurre el daño.\nAsimismo, según la doctrina establecida en la Sentencia del 22 de abril de 1997 (Exp. 5743), la responsabilidad no se desplaza automáticamente con la venta del vehículo o la externalización de la actividad, si la empresa continúa obteniendo un beneficio económico de la misma. Ahora bien pese a no ser la propietaria directa del vehículo involucrado en el siniestro o la actividad principal de la empresa no sea el transporte, mantiene un claro vínculo económico con la actividad que generó el daño, toda vez que, asi la entidad no tenga como actividad principal el transporte, utiliza vehículos en sus operaciones y sigue obteniendo beneficios de esta actividad, generando así la actividad peligrosa. Este vínculo económico no la exime de responsabilidad, ya que, conforme a la doctrina expuesta por la Corte Suprema, la simple transferencia de la propiedad o la tercerización de la actividad no desplaza automáticamente la responsabilidad civil, si la empresa responsable sigue beneficiándose de la operación que ocasionó el perjuicio.\nEn conclusión, en el contexto de la responsabilidad civil extracontractual en Colombia, tanto la jurisprudencia de la Corte Suprema como la normativa vigente establecen que la responsabilidad por daños en actividades peligrosas recae sobre quienes detentan el control, dirección y obtienen un beneficio económico de la actividad, independientemente de la propiedad directa de los bienes involucrados. Las empresas que conservan influencia y provecho económico en actividades riesgosas, como la operación de vehículos  pueden ser solidariamente responsables por los daños causados, debiendo responder por ellos.\n\nLa responsabilidad de la empresa de transportes  \n\nLa afiliación de vehículos automotores a una empresa prestadora del servicio público de transporte conlleva una serie de responsabilidades de carácter legal, establecidas en la Ley 336 de 1996. El artículo 36 de esta norma establece: "Los conductores de los equipos destinados al servicio público de transporte serán contratados directamente por la empresa operadora de transporte, quien para todos los efectos será solidariamente responsable junto con el propietario del equipo."[ Ley 336 de 1996. Por la cual se adopta el estatuto nacional de transporte. Diciembre 20 de 1996.]\n\nLa responsabilidad solidaria planteada en estos términos implica que la empresa de transporte deberá responder por los créditos en cabeza de cualquiera de sus conductores, derivados de la ejecución de la actividad de transporte. Por lo tanto, este fundamento legal activa la posibilidad de efectuar el cobro directo a la empresa de transporte cuando los perjuicios ocasionados a un tercero sean producto de la responsabilidad de uno de sus vehículos afiliados. Por lo tanto, solicitamos de manera respetuosa que se acojan a nuestras pretensiones.`;
 };
 
 export const getDefaultAnexosContent = (formData = {}) => {
@@ -199,13 +349,28 @@ const generateHechosContent = (formData = {}) => {
   const placasPrimerVehiculo = formData.placasPrimerVehiculo || '{placasPrimerVehiculo}';
   const propietarioPrimerVehiculo = formData.propietarioPrimerVehiculo || '{propietarioPrimerVehiculo}';
   const placasSegundoVehiculo = formData.placasSegundoVehiculo || '{placasSegundoVehiculo}';
-  const propietarioSegundoVehiculo = formData.propietarioSegundoVehiculo || '{propietarioSegundoVehiculo}';
+  
+  // Lógica para combinar propietario y afiliador
+  const propietarioSegundoVehiculo = formData.propietarioSegundoVehiculo?.trim() || '';
+  const afiliador = formData.afiliador?.trim() || '';
+  
+  let propietarioYAfiliador;
+  if (propietarioSegundoVehiculo && afiliador) {
+    propietarioYAfiliador = `${propietarioSegundoVehiculo} - ${afiliador}`;
+  } else if (propietarioSegundoVehiculo) {
+    propietarioYAfiliador = propietarioSegundoVehiculo;
+  } else if (afiliador) {
+    propietarioYAfiliador = afiliador;
+  } else {
+    propietarioYAfiliador = '{propietarioSegundoVehiculo}';
+  }
+  
   const conductorVehiculoInfractor = formData.conductorVehiculoInfractor || '{conductorVehiculoInfractor}';
   const cedulaConductorInfractor = formData.cedulaConductorInfractor || '{cedulaConductorInfractor}';
   const numeroPolizaSura = formData.numeroPolizaSura || '{numeroPolizaSura}';
   const cuantia = formatCurrency(formData.cuantia);
   return `
-1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en la ${direccionAccidente}, de la ciudad de ${ciudad}, ${departamento}; se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} de propiedad de ${propietarioPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${propietarioSegundoVehiculo} conducido por ${conductorVehiculoInfractor} identificado con cédula de ciudadanía ${cedulaConductorInfractor}.\n
+1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en la ${direccionAccidente}, de la ciudad de ${ciudad}, ${departamento}; se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} de propiedad de ${propietarioPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${propietarioYAfiliador} conducido por ${conductorVehiculoInfractor} identificado con cédula de ciudadanía ${cedulaConductorInfractor}.\n
 2. Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.\n
 3. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.\n
 4. Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia} por concepto de reparación de los daños materiales sufridos al vehículo de placas ${placasPrimerVehiculo}.`;

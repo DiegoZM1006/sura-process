@@ -25,6 +25,7 @@ interface StepOneProps {
     propietarioPrimerVehiculo: string
     placasSegundoVehiculo: string
     propietarioSegundoVehiculo: string
+    afiliador: string
     conductorVehiculoInfractor: string
     cedulaConductorInfractor: string
     numeroPolizaSura: string
@@ -260,7 +261,7 @@ export function StepOne({
           
           <div className="grid gap-2">
             <Label htmlFor="placasPrimerVehiculo">
-              12. Placas Primer Vehículo <span className="text-red-500">*</span>
+              12. Placas Vehículo Asegurado <span className="text-red-500">*</span>
             </Label>
             <Input
               id="placasPrimerVehiculo"
@@ -273,7 +274,7 @@ export function StepOne({
 
           <div className="grid gap-2">
             <Label htmlFor="propietarioPrimerVehiculo">
-              13. Propietario Primer Vehículo <span className="text-red-500">*</span>
+              13. Propietario Vehículo Asegurado <span className="text-red-500">*</span>
             </Label>
             <Input
               id="propietarioPrimerVehiculo"
@@ -309,6 +310,19 @@ export function StepOne({
               required
             />
           </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="afiliador">
+              16. Afiliador
+            </Label>
+            <Input
+              id="afiliador"
+              value={formData.afiliador}
+              onChange={(e) => handleInputChange('afiliador', e.target.value)}
+              placeholder="Nombre del afiliador"
+              required
+            />
+          </div>
         </div>
 
         {/* Información del Conductor Infractor */}
@@ -317,7 +331,7 @@ export function StepOne({
           
           <div className="grid gap-2">
             <Label htmlFor="conductorVehiculoInfractor">
-              16. Conductor Vehículo Infractor <span className="text-red-500">*</span>
+              17. Conductor Vehículo Infractor <span className="text-red-500">*</span>
             </Label>
             <Input
               id="conductorVehiculoInfractor"
@@ -330,7 +344,7 @@ export function StepOne({
 
           <div className="grid gap-2">
             <Label htmlFor="cedulaConductorInfractor">
-              17. Cédula del Conductor Infractor <span className="text-red-500">*</span>
+              18. Cédula del Conductor Infractor <span className="text-red-500">*</span>
             </Label>
             <Input
               id="cedulaConductorInfractor"
@@ -348,7 +362,7 @@ export function StepOne({
           
           <div className="grid gap-2">
             <Label htmlFor="numeroPolizaSura">
-              18. Número de Póliza Sura <span className="text-red-500">*</span>
+              19. Número de Póliza Sura <span className="text-red-500">*</span>
             </Label>
             <Input
               id="numeroPolizaSura"
@@ -361,7 +375,7 @@ export function StepOne({
 
           <div className="grid gap-2">
             <Label htmlFor="cuantia">
-              19. Cuantía (Cantidad de dinero por todos los daños) <span className="text-red-500">*</span>
+              20. Cuantía (Cantidad de dinero por todos los daños) <span className="text-red-500">*</span>
             </Label>
             <Input
               id="cuantia"

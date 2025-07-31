@@ -3,7 +3,7 @@ import { generateDocumentBlob } from '@/lib/document-generator-server'
 import { mergePDFsWithAnnexes } from '@/lib/pdf-merger'
 
 export async function POST(request: NextRequest) {
-  console.log('=== INICIO DEL PROCESO DE DESCARGA DE WORD CON ANEXOS ===')
+  console.log('=== INICIO DEL PROCESO DE DESCARGA DE WORD CON ANEXOS E IMÁGENES ===')
   try {
     console.log('Obteniendo FormData...')
     const formData = await request.formData()
@@ -21,20 +21,75 @@ export async function POST(request: NextRequest) {
     console.log('Extrayendo datos del formulario...')
     const documentData: any = {}
     const anexoFiles: File[] = []
+    const imageFiles: any[] = []
+    let imageMetadata: any[] = []
     
     for (const [key, value] of formData.entries()) {
       if (key === 'anexos' && value instanceof File) {
         // Recolectar archivos anexos del step 2
         anexoFiles.push(value)
         console.log(`Anexo encontrado: ${value.name} (${value.size} bytes)`)
+      } else if (key.startsWith('imagen_') && value instanceof File) {
+        // Recolectar archivos de imágenes
+        const imageIndex = parseInt(key.replace('imagen_', ''))
+        
+        // Leer el archivo y convertir a data URL
+        const arrayBuffer = await value.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer)
+        
+        // Crear data URL base64 correcto
+        const mimeType = value.type || 'image/jpeg'
+        // Asegurar que el mimeType sea compatible con docxtemplater-image-module-free
+        const validMimeType = mimeType.includes('jpeg') ? 'image/jpg' : mimeType
+        const base64String = `data:${validMimeType};base64,${buffer.toString('base64')}`
+        
+        console.log(`Imagen ${imageIndex} procesada:`, {
+          name: value.name,
+          originalType: value.type,
+          processedType: validMimeType,
+          size: value.size,
+          base64Length: base64String.length,
+          base64Preview: base64String.substring(0, 50) + '...'
+        })
+        
+        imageFiles.push({
+          data: base64String, // Data URL completo
+          name: value.name,
+          width: 400, // Se actualizará con metadatos
+          height: 300, // Se actualizará con metadatos
+          index: imageIndex,
+          mimeType: validMimeType
+        })
+        
+      } else if (key === 'imagenesMetadata') {
+        // Obtener metadatos de las imágenes
+        try {
+          imageMetadata = JSON.parse(value as string)
+          console.log('Metadatos de imágenes:', imageMetadata.length)
+        } catch (error) {
+          console.error('Error parseando metadatos de imágenes:', error)
+          imageMetadata = []
+        }
       } else if (key !== 'caseType') {
         documentData[key] = value
       }
     }
+
+    // Actualizar metadatos de imágenes con información correcta
+    imageFiles.forEach(imgFile => {
+      const metadata = imageMetadata.find(m => m.id === imgFile.index)
+      if (metadata) {
+        imgFile.width = metadata.width
+        imgFile.height = metadata.height
+        imgFile.name = metadata.name
+        console.log(`Metadatos aplicados a imagen ${imgFile.index}: ${metadata.width}x${metadata.height}`)
+      }
+    })
     
     console.log('Datos extraídos para documento:', {
       keys: Object.keys(documentData),
       anexosCount: anexoFiles.length,
+      imagenesCount: imageFiles.length,
       caseType,
       sampleData: {
         nombreEmpresa: documentData.nombreEmpresa,
@@ -43,17 +98,17 @@ export async function POST(request: NextRequest) {
       }
     })
     
-    console.log('Generando documento Word para descarga...')
+    console.log('Generando documento Word para descarga con imágenes...')
     
-    // Generar documento Word
+    // Generar documento Word con imágenes
     let documentBlob: Blob
     try {
-      documentBlob = await generateDocumentBlob(documentData, caseType)
-      console.log('Documento generado exitosamente')
+      documentBlob = await generateDocumentBlob(documentData, caseType, undefined, imageFiles)
+      console.log('Documento generado exitosamente con imágenes')
     } catch (error) {
       console.error('Error generando documento:', error)
       return NextResponse.json(
-        { success: false, error: 'Error al generar el documento' },
+        { success: false, error: 'Error al generar el documento con imágenes' },
         { status: 500 }
       )
     }
@@ -90,9 +145,9 @@ export async function POST(request: NextRequest) {
           console.log('Iniciando merge de PDF principal con anexos...')
           const mergedPdfBuffer = await mergePDFsWithAnnexes(documentBuffer, annexBuffers)
           
-          const filename = `${caseType.replace(/\s+/g, '_')}_${fecha}_COMPLETO.pdf`
+          const filename = `${caseType.replace(/\s+/g, '_')}_${fecha}_COMPLETO_CON_IMAGENES.pdf`
           
-          console.log('PDF combinado creado exitosamente')
+          console.log('PDF combinado creado exitosamente con imágenes')
           
           // Retornar el PDF combinado
           return new NextResponse(mergedPdfBuffer, {
@@ -109,8 +164,8 @@ export async function POST(request: NextRequest) {
           
           // Si falla el merge, enviar solo el documento principal
           const filename = isPDF 
-            ? `${caseType.replace(/\s+/g, '_')}_${fecha}.pdf`
-            : `${caseType.replace(/\s+/g, '_')}_${fecha}.docx`
+            ? `${caseType.replace(/\s+/g, '_')}_${fecha}_CON_IMAGENES.pdf`
+            : `${caseType.replace(/\s+/g, '_')}_${fecha}_CON_IMAGENES.docx`
           
           return new NextResponse(documentBuffer, {
             status: 200,
@@ -123,12 +178,12 @@ export async function POST(request: NextRequest) {
         }
         
       } else {
-        // Sin anexos o documento no es PDF - enviar documento principal solamente
-        console.log('Enviando documento principal sin anexos')
+        // Sin anexos o documento no es PDF - enviar documento principal con imágenes
+        console.log('Enviando documento principal con imágenes, sin anexos adicionales')
         
         const filename = isPDF 
-          ? `${caseType.replace(/\s+/g, '_')}_${fecha}.pdf`
-          : `${caseType.replace(/\s+/g, '_')}_${fecha}.docx`
+          ? `${caseType.replace(/\s+/g, '_')}_${fecha}_CON_IMAGENES.pdf`
+          : `${caseType.replace(/\s+/g, '_')}_${fecha}_CON_IMAGENES.docx`
         
         return new NextResponse(documentBuffer, {
           status: 200,
