@@ -326,9 +326,6 @@ export async function POST(request: NextRequest) {
 
     // Agregar información sobre imágenes al mensaje del email si hay imágenes
     let emailMessageWithImages = emailMessage
-    if (imageFiles.length > 0) {
-      emailMessageWithImages += `\n\n---\n\nEste documento incluye ${imageFiles.length} imagen(es) de evidencia fotográfica integrada(s) en el archivo adjunto.`
-    }
 
     // Configurar el contenido del email
     const mailOptions = {
@@ -339,16 +336,16 @@ export async function POST(request: NextRequest) {
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
           ${emailMessageWithImages.replace(/\n/g, '<br>')}
           
+          <div style="margin-top: 30px;">
+          <img src="cid:logo" alt="BTL Legal Group" style="max-width: 150px; height: auto;" />
+          </div>
+          
           ${imageFiles.length > 0 ? `
           <div style="margin-top: 20px; padding: 10px; background-color: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px;">
-            <strong>📷 Evidencia Fotográfica:</strong> Este documento incluye ${imageFiles.length} imagen(es) integrada(s) como evidencia del siniestro.
+            <strong>📷 Evidencia Fotográfica:</strong> Este documento incluye ${imageFiles.length} imagen(es) integrada(s) como evidencia de los hechos.
           </div>
           ` : ''}
-          
-          <div style="margin-top: 30px;">
-            <img src="cid:logo" alt="BTL Legal Group" style="max-width: 150px; height: auto;" />
-          </div>
-          
+
           <div style="margin-top: 30px; padding: 15px; background-color: #f8f9fa; border-left: 4px solid #007bff; font-size: 12px;">
             <strong>AVISO DE CONFIDENCIALIDAD:</strong> El anterior mensaje de correo electrónico y sus anexos contienen información confidencial y, por lo tanto, sujeta a reserva. Si usted no es destinatario del mismo debe proceder a informar mediante correo electrónico a la persona que lo envió y a borrar de su sistema tanto el correo recibido como el enviado, sin conservar copias. En todo caso el uso, difusión, distribución o reproducción del presente mensaje, sin autorización, es prohibido y puede configurar un delito.
           </div>

@@ -30,6 +30,7 @@ interface StepOneProps {
     cedulaConductorInfractor: string
     numeroPolizaSura: string
     cuantia: string
+    deducible: string
   }
   handleInputChange: (field: string, value: string | string[]) => void
   onNext: () => void
@@ -382,6 +383,20 @@ export function StepOne({
               type="number"
               value={formData.cuantia}
               onChange={(e) => handleInputChange('cuantia', e.target.value)}
+              placeholder="$0"
+              required
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="deducible">
+              21. Deducible
+            </Label>
+            <Input
+              id="deducible"
+              type="number"
+              value={formData.deducible}
+              onChange={(e) => handleInputChange('deducible', e.target.value)}
               placeholder="$0"
               required
             />

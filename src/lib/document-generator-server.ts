@@ -65,7 +65,7 @@ function base64DataURLToArrayBuffer(dataURL: string) {
 }
 
 // Función para preparar los datos para la plantilla
-const prepareTemplateData = async (formData: any, tabContents?: any, imageFiles?: any[]) => {
+const prepareTemplateData = async (formData: any, caseType: string, tabContents?: any, imageFiles?: any[]) => {
   // Obtener fecha actual formateada
   const fechaActual = new Date()
   const fechaHoy = formatDateSpanish(fechaActual.toISOString())
@@ -84,14 +84,14 @@ const prepareTemplateData = async (formData: any, tabContents?: any, imageFiles?
     ? `${formData.diaAccidente} de ${formData.mesAccidente} del ${formData.añoAccidente}`
     : 'XXX de XXXX del 2024'
 
-  // Preparar contenido de anexos
-  const anexosContent = tabContents?.anexos || formData.contenidoAnexos || getDefaultAnexosContent(formData)
+  // Preparar contenido de anexos según el tipo de caso
+  const anexosContent = tabContents?.anexos || formData.contenidoAnexos || getDefaultAnexosContent(formData, caseType)
   
-  // Preparar contenido de hechos
-  const hechosContent = tabContents?.hechos || formData.contenidoHechos || getDefaultHechosContent(formData);
+  // Preparar contenido de hechos según el tipo de caso
+  const hechosContent = tabContents?.hechos || formData.contenidoHechos || getDefaultHechosContent(formData, caseType);
 
   // Preparar datos de imágenes para docxtemplater
-  let imagenesHechos: any[] = [] // Cambiar de vuelta a array para múltiples imágenes
+  let imagenesHechos: any[] = []
   
   if (imageFiles && imageFiles.length > 0) {
     console.log('Procesando múltiples imágenes para plantilla:', imageFiles.length)
@@ -106,11 +106,9 @@ const prepareTemplateData = async (formData: any, tabContents?: any, imageFiles?
           dataType: typeof imgFile.data
         })
         
-        // Para la sintaxis {#imagenesHechos}{%src}{/imagenesHechos}
-        // Necesitamos objetos con propiedad 'src'
         if (imgFile.data && typeof imgFile.data === 'string' && imgFile.data.startsWith('data:image')) {
           const imageObj = {
-            src: imgFile.data, // La propiedad 'src' que usará {%src}
+            src: imgFile.data,
             width: imgFile.width || 400,
             height: imgFile.height || 300,
             name: imgFile.name || `imagen_${index}`,
@@ -131,14 +129,6 @@ const prepareTemplateData = async (formData: any, tabContents?: any, imageFiles?
     }).filter(img => img !== null)
     
     console.log('Imágenes procesadas para plantilla:', imagenesHechos.length)
-    if (imagenesHechos.length > 0) {
-      console.log('Primera imagen objeto:', {
-        hasSrc: !!imagenesHechos[0].src,
-        width: imagenesHechos[0].width,
-        height: imagenesHechos[0].height,
-        srcPreview: imagenesHechos[0].src ? imagenesHechos[0].src.substring(0, 50) + '...' : 'No src'
-      })
-    }
   } else {
     console.log('No hay imágenes para procesar')
   }
@@ -184,17 +174,18 @@ const prepareTemplateData = async (formData: any, tabContents?: any, imageFiles?
     // Información económica y póliza (usando los nombres del formulario)
     cuantia: formatCurrency(formData.cuantia),
     numeroPolizaSura: formatValue(formData.numeroPolizaSura, 'XXXXXXXXXX'),
+    deducible: formatCurrency(formData.deducible, '0'),
     
-    // Contenido de anexos editado por el usuario
+    // Contenido de anexos y hechos editado por el usuario
     anexos: anexosContent,
     contenidoAnexos: anexosContent,
     contenidoHechos: hechosContent,
     
-    // NUEVA VARIABLE PARA LAS IMÁGENES DE HECHOS
+    // Variable para las imágenes de hechos
     imagenesHechos: imagenesHechos,
   }
 
-  console.log('Template data preparado:', {
+  console.log('Template data preparado para tipo:', caseType, {
     ...templateData,
     imagenesHechos: imagenesHechos.length > 0 ? `${imagenesHechos.length} imágenes con propiedad src` : 'No hay imágenes'
   })
@@ -202,23 +193,54 @@ const prepareTemplateData = async (formData: any, tabContents?: any, imageFiles?
   return templateData
 }
 
-// Función para obtener contenido por defecto de anexos (debe coincidir con el frontend)
-const getDefaultAnexosContent = (formData: any = {}) => {
+// Función para obtener contenido por defecto de anexos según el tipo de caso
+const getDefaultAnexosContent = (formData: any = {}, caseType: string = "") => {
   const numeroPoliza = formData.numeroPolizaSura || '{numeroPolizaSura}';
-  
-  return `
-1. Aviso de siniestro de póliza ${numeroPoliza} expedida por Seguros Generales Sura S.A.
+  const placasPrimerVehiculo = formData.placasPrimerVehiculo || '{placasPrimerVehiculo}';
+  const propietarioPrimerVehiculo = formData.propietarioPrimerVehiculo || '{propietarioPrimerVehiculo}';
+
+
+  switch (caseType) {
+    case 'RCE SOLO DEDUCIBLE':
+      return `1. Factura de pago de deducible del vehículo ${placasPrimerVehiculo} asumido por ${propietarioPrimerVehiculo}
+
+2. Registro fotográfico dispuesto en el Artículo 16 de la Ley 2251 del 2022.
+
+3. Poder de asegurado autorizando reclamación del deducible.
+
+4. Copia de documento de identidad de asegurado por Seguros generales Sura
+
+5. Copia de tarjeta de propiedad del vehículo afectado.
+
+6. Certificación bancaria de ${propietarioPrimerVehiculo}`;
+
+    case 'RCE DAÑOS + OBJECION':
+      return `1.Aviso de siniestro de póliza ${numeroPoliza} expedida por Seguros Generales Sura S.A.
+
+      2.Registro fotográfico dispuesto en el Artículo 16 de la Ley 2251 del 2022 / IPAT.
+
+      3.Constancia de pago de daños materiales del vehículo asegurado por Sura S.A.
+
+      4.Copia simple de la Escritura Pública No. 392 del 12 de abril de 2016, a través del cual se otorga la representación legal general al suscrito.
+
+      5. Copia de objeción por parte de la aseguradora.`;
+      
+
+    case 'RCE DAÑOS':
+    default:
+      return `1. Aviso de siniestro de póliza ${numeroPoliza} expedida por Seguros Generales Sura S.A.
 
 2. Registro fotográfico dispuesto en el Artículo 16 de la Ley 2251 del 2022 / IPAT.
 
 3. Constancia de pago de daños materiales del vehículo asegurado por Sura S.A.
 
 4. Copia simple de la Escritura Pública No. 392 del 12 de abril de 2016, a través del cual se otorga la representación legal general al suscrito.`;
+  }
 };
 
-// Agregar función getDefaultHechosContent
-const getDefaultHechosContent = (formData: any = {}) => {
- const diaAccidente = formData.diaAccidente || '{diaAccidente}';
+// Función para obtener contenido por defecto de hechos según el tipo de caso
+const getDefaultHechosContent = (formData: any = {}, caseType: string = "") => {
+  const diaAccidente = formData.diaAccidente || '{diaAccidente}';
   const mesAccidente = formData.mesAccidente || '{mesAccidente}';
   const añoAccidente = formData.añoAccidente || '{añoAccidente}';
   const direccionAccidente = formData.direccionAccidente || '{direccionAccidente}';
@@ -227,11 +249,14 @@ const getDefaultHechosContent = (formData: any = {}) => {
   const placasPrimerVehiculo = formData.placasPrimerVehiculo || '{placasPrimerVehiculo}';
   const propietarioPrimerVehiculo = formData.propietarioPrimerVehiculo || '{propietarioPrimerVehiculo}';
   const placasSegundoVehiculo = formData.placasSegundoVehiculo || '{placasSegundoVehiculo}';
-  
-  // Lógica para combinar propietario y afiliador
   const propietarioSegundoVehiculo = formData.propietarioSegundoVehiculo?.trim() || '';
   const afiliador = formData.afiliador?.trim() || '';
-  
+  const conductorVehiculoInfractor = formData.conductorVehiculoInfractor || '{conductorVehiculoInfractor}';
+  const cedulaConductorInfractor = formData.cedulaConductorInfractor || '{cedulaConductorInfractor}';
+  const numeroPolizaSura = formData.numeroPolizaSura || '{numeroPolizaSura}';
+  const cuantia = formatCurrency(formData.cuantia);
+
+  // Lógica para combinar propietario y afiliador
   let propietarioYAfiliador;
   if (propietarioSegundoVehiculo && afiliador) {
     propietarioYAfiliador = `${propietarioSegundoVehiculo} - ${afiliador}`;
@@ -242,23 +267,70 @@ const getDefaultHechosContent = (formData: any = {}) => {
   } else {
     propietarioYAfiliador = '{propietarioSegundoVehiculo}';
   }
-  
-  const conductorVehiculoInfractor = formData.conductorVehiculoInfractor || '{conductorVehiculoInfractor}';
-  const cedulaConductorInfractor = formData.cedulaConductorInfractor || '{cedulaConductorInfractor}';
-  const numeroPolizaSura = formData.numeroPolizaSura || '{numeroPolizaSura}';
-  const cuantia = formatCurrency(formData.cuantia);
-  return `
-1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en la ${direccionAccidente}, de la ciudad de ${ciudad}, ${departamento}; se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} de propiedad de ${propietarioPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${propietarioYAfiliador} conducido por ${conductorVehiculoInfractor} identificado con cédula de ciudadanía ${cedulaConductorInfractor}.\n
-2. Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.\n
-3. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.\n
+
+  switch (caseType) {
+    case 'RCE SOLO DEDUCIBLE':
+      return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en la ${direccionAccidente} ${ciudad}, ${departamento} se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} de propiedad de ${propietarioPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} afiliado a la empresa de transportes ${afiliador} conducido por ${conductorVehiculoInfractor}
+
+2. Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.
+
+3. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
+
+4. Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma por concepto de reparación de los daños materiales sufridos por el vehículo de placas ${placasPrimerVehiculo}.
+
+5. Para que el vehículo de placas ${placasPrimerVehiculo} fuese reparado, ${propietarioPrimerVehiculo} locatario y tenedor material del vehículo debió asumir el valor de un deducible por la suma de $ ${cuantia} (de lo cual quedó constancia en la factura anexada al presente documento.`;
+
+    case 'RCE DAÑOS + OBJECION':
+      return `1.El ${diaAccidente} de ${mesAccidente} del ${añoAccidente}  en ${direccionAccidente} de la ciudad de ${ciudad}.; se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${afiliador}
+
+2.Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo} 
+
+3.El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
+
+4.Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia}  por concepto de daños sufridos al vehículo de placas ${placasPrimerVehiculo}.
+
+5. En consecuencia, se presentó reclamación de responsabilidad civil ante la aseguradora MUNDIAL frente al siniestro en mención, no obstante, objetan la reclamación, dejando sin cobertura al vehículo del tercero responsable.`;
+
+    case 'RCE DAÑOS':
+    default:
+      return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en la ${direccionAccidente}, de la ciudad de ${ciudad}, ${departamento}; se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} de propiedad de ${propietarioPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${propietarioYAfiliador} conducido por ${conductorVehiculoInfractor} identificado con cédula de ciudadanía ${cedulaConductorInfractor}.
+
+2. Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.
+
+3. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
+
 4. Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia} por concepto de reparación de los daños materiales sufridos al vehículo de placas ${placasPrimerVehiculo}.`;
+  }
+};
+
+// Función para obtener la ruta de la plantilla según el tipo de caso
+const getTemplatePath = (caseType: string): string => {
+  switch (caseType) {
+    case 'RCE DAÑOS':
+      return path.join(process.cwd(), 'public', 'docs', 'rce_daños.docx');
+    
+    case 'RCE SOLO DEDUCIBLE':
+      return path.join(process.cwd(), 'public', 'docs', 'rce-solo-deducible.docx');
+
+    case 'RCE DAÑOS + OBJECION':
+      return path.join(process.cwd(), 'public', 'docs', 'rce-danos-objecion.docx');
+    
+    case 'RCE DAÑOS + DEDUCIBLE':
+      return path.join(process.cwd(), 'public', 'docs', 'rce-danos-deducible.docx');
+
+    case 'RCE HURTO':
+      return path.join(process.cwd(), 'public', 'docs', 'rce_hurto.docx');
+    
+    default:
+      throw new Error(`Tipo de caso no soportado: ${caseType}`);
+  }
 };
 
 export const generateDocumentBlobServer = async (
   formData: any, 
   caseType: string, 
   tabContents?: any,
-  imageFiles?: any[] // Nuevo parámetro para las imágenes
+  imageFiles?: any[]
 ): Promise<Blob> => {
   try {
     console.log('=== INICIO GENERACIÓN DE DOCUMENTO EN SERVIDOR ===')
@@ -268,16 +340,7 @@ export const generateDocumentBlobServer = async (
     console.log('Imágenes recibidas:', imageFiles ? imageFiles.length : 0)
     
     // Determinar qué plantilla usar basado en el tipo de caso
-    let templatePath = ''
-    
-    if (caseType === 'RECLAMACION RCE DAÑOS') {
-      templatePath = path.join(process.cwd(), 'public', 'docs', 'rce_daños.docx')
-    } else if (caseType === 'RECLAMACION RCE HURTO') {
-      templatePath = path.join(process.cwd(), 'public', 'docs', 'rce_hurto.docx')
-    } else {
-      throw new Error('Tipo de caso no soportado')
-    }
-
+    const templatePath = getTemplatePath(caseType);
     console.log('Ruta de plantilla:', templatePath)
 
     // Verificar que el archivo existe
@@ -297,7 +360,6 @@ export const generateDocumentBlobServer = async (
       getImage(tag: any) {
         console.log('getImage llamado con tag:', typeof tag, tag ? tag.substring(0, 50) + '...' : 'undefined');
         
-        // Para {#imagenesHechos}{%src}{/imagenesHechos}, tag será el valor de 'src'
         if (typeof tag === 'string' && tag.startsWith('data:image')) {
           console.log('Procesando data URL desde propiedad src');
           const result = base64DataURLToArrayBuffer(tag);
@@ -311,13 +373,11 @@ export const generateDocumentBlobServer = async (
       getSize(img: any, tagValue: any, tagName: string) {
         console.log('getSize llamado para tagName:', tagName, 'tagValue type:', typeof tagValue);
         
-        // Para {%src}, tagValue será el objeto completo de la imagen
         if (tagValue && typeof tagValue === 'object' && tagValue.width && tagValue.height) {
           console.log('Usando dimensiones del objeto imagen:', tagValue.width, 'x', tagValue.height);
           return [tagValue.width, tagValue.height];
         }
         
-        // Dimensiones por defecto
         console.log('Usando dimensiones por defecto: 400x300');
         return [400, 300];
       },
@@ -332,7 +392,7 @@ export const generateDocumentBlobServer = async (
       doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
-        modules: [imageModule] // Agregar el módulo de imágenes
+        modules: [imageModule]
       })
       console.log('Docxtemplater creado exitosamente con soporte para imágenes')
     } catch (error) {
@@ -342,7 +402,7 @@ export const generateDocumentBlobServer = async (
 
     // Preparar los datos para la plantilla incluyendo contenido de tabs e imágenes
     console.log('Preparando datos para plantilla con imágenes...')
-    const templateData = await prepareTemplateData(formData, tabContents, imageFiles)
+    const templateData = await prepareTemplateData(formData, caseType, tabContents, imageFiles)
     console.log('Datos preparados:', Object.keys(templateData))
     console.log('Imágenes en templateData:', templateData.imagenesHechos ? templateData.imagenesHechos.length : 0)
     
@@ -399,7 +459,7 @@ export const generateDocumentBlobServer = async (
       console.log('Intentando conversión a PDF con LibreOffice...')
       
       // Configurar la ruta de LibreOffice si no está en el PATH
-      const libreOfficePath = 'C:\\Program Files\\LibreOffice\\program\\soffice.exe'
+      const libreOfficePath = process.env.LIBREOFFICE_PATH || 'C:\\Program Files\\LibreOffice\\program\\soffice.exe'
       if (require('fs').existsSync(libreOfficePath)) {
         process.env.LIBREOFFICE_PATH = libreOfficePath
         console.log('Configurando ruta de LibreOffice:', libreOfficePath)
@@ -423,6 +483,7 @@ export const generateDocumentBlobServer = async (
       
       console.log('=== DOCUMENTO PDF CON IMÁGENES GENERADO EXITOSAMENTE ===')
       console.log('Tamaño del blob PDF:', blob.size, 'bytes')
+      console.log('Tipo de caso procesado:', caseType)
       
       return blob
       
@@ -436,6 +497,7 @@ export const generateDocumentBlobServer = async (
       
       console.log('=== DOCUMENTO DOCX CON IMÁGENES GENERADO COMO FALLBACK ===')
       console.log('Tamaño del blob DOCX:', blob.size, 'bytes')
+      console.log('Tipo de caso procesado:', caseType)
       
       return blob
     }
@@ -443,6 +505,7 @@ export const generateDocumentBlobServer = async (
   } catch (error) {
     console.error('=== ERROR AL GENERAR DOCUMENTO EN SERVIDOR ===')
     console.error('Error:', error)
+    console.error('Tipo de caso que falló:', caseType)
     throw error
   }
 }

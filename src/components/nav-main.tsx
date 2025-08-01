@@ -31,8 +31,16 @@ import { useRouter } from "next/navigation"
 
 // Opciones de casos - puedes modificar estas opciones según tus necesidades
 const CASE_OPTIONS = [
-  { value: "rce-daños", label: "RECLAMACION RCE DAÑOS" },
-  { value: "rce-hurto", label: "RECLAMACION RCE HURTO" }
+  { value: "rce-danos", label: "RCE DAÑOS" }, // HECHO
+  // { value: "rce-hurto", label: "RCE HURTO" }, // POR IMPLEMENTAR
+  { value: "rce-solo-deducible", label: "RCE SOLO DEDUCIBLE" }, // HECHO
+  { value: "rce-danos-deducible", label: "RCE DAÑOS + DEDUCIBLE" }, // IMPLEMENTANDO
+  { value: "rce-danos-objecion", label: "RCE DAÑOS + OBJECION" }, // HECHO
+  // { value: "rce-danos-deducible-objecion", label: "RCE DAÑOS + DEDUCIBLE + OBJECION" }, // POR IMPLEMENTAR
+  // { value: "rce-hurto-deducible", label: "RCE HURTO + DEDUCIBLE" }, // POR IMPLEMENTAR
+  
+  // TODO: Por verificar si es correcto
+  // { value: "rce-solo-deducible-objecion", label: "RCE SOLO DEDUCIBLE + OBJECION" }, // POR IMPLEMENTAR
 ]
 
 export function NavMain({

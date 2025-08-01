@@ -11,8 +11,16 @@ import { EditorFooter } from "@/components/case-creation/editor-footer"
 
 // Mapeo de tipos de casos
 const CASE_TYPE_MAPPING: Record<string, string> = {
-    "rce-daños": "RECLAMACION RCE DAÑOS",
-    "rce-hurto": "RECLAMACION RCE HURTO"
+    "rce-danos": "RCE DAÑOS",
+    "rce-hurto": "RCE HURTO",
+    "rce-solo-deducible": "RCE SOLO DEDUCIBLE",
+    "rce-danos-deducible": "RCE DAÑOS + DEDUCIBLE",
+    "rce-danos-objecion": "RCE DAÑOS + OBJECION",
+    "rce-danos-deducible-objecion": "RCE DAÑOS + DEDUCIBLE + OBJECION",
+    "rce-hurto-deducible": "RCE HURTO + DEDUCIBLE",
+
+    // TODO: Por verificar si es correcto
+    "rce-solo-deducible-objecion": "RCE SOLO DEDUCIBLE + OBJECION",
 }
 
 export default function CreateCasePage() {
@@ -45,6 +53,7 @@ export default function CreateCasePage() {
         conductorVehiculoInfractor: "",
         cedulaConductorInfractor: "",
         numeroPolizaSura: "",
+        deducible: "", // Añadir deducible
         cuantia: "",
         anexos: [] as File[], // Añadir anexos persistentes
     })
