@@ -12,7 +12,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('=== INICIO DEL PROCESO DE ENVÍO DE EMAIL CON IMÁGENES ===')
+  console.log('=== INICIO DEL PROCESO DE ENVÍO DE EMAIL CON IMÁGENES Y VIDEOS ===')
   try {
     console.log('Obteniendo FormData...')
     const formData = await request.formData()
@@ -76,8 +76,10 @@ export async function POST(request: NextRequest) {
     console.log('Extrayendo datos del formulario...')
     const documentData: any = {}
     const anexoFiles: File[] = []
-    const imageFiles: any[] = [] // Nuevo array para imágenes
+    const imageFiles: any[] = []
+    const videoFiles: any[] = [] // Nuevo array para videos
     let imageMetadata: any[] = []
+    let videoMetadata: any[] = []
     
     for (const [key, value] of formData.entries()) {
       if (key === 'anexos' && value instanceof File) {
@@ -115,6 +117,25 @@ export async function POST(request: NextRequest) {
           mimeType: validMimeType
         })
         
+      } else if (key.startsWith('video_') && value instanceof File) {
+        // Recolectar archivos de videos
+        const videoIndex = parseInt(key.replace('video_', ''))
+        
+        console.log(`Video ${videoIndex} encontrado para email:`, {
+          name: value.name,
+          type: value.type,
+          size: value.size,
+          sizeInMB: (value.size / 1024 / 1024).toFixed(2)
+        })
+        
+        videoFiles.push({
+          file: value,
+          name: value.name,
+          size: value.size,
+          type: value.type,
+          index: videoIndex
+        })
+        
       } else if (key === 'imagenesMetadata') {
         // Obtener metadatos de las imágenes
         try {
@@ -123,6 +144,15 @@ export async function POST(request: NextRequest) {
         } catch (error) {
           console.error('Error parseando metadatos de imágenes:', error)
           imageMetadata = []
+        }
+      } else if (key === 'videosMetadata') {
+        // Obtener metadatos de los videos
+        try {
+          videoMetadata = JSON.parse(value as string)
+          console.log('Metadatos de videos para email:', videoMetadata.length)
+        } catch (error) {
+          console.error('Error parseando metadatos de videos:', error)
+          videoMetadata = []
         }
       } else if (!key.startsWith('email') && key !== 'caseType') {
         documentData[key] = value
@@ -139,11 +169,21 @@ export async function POST(request: NextRequest) {
         console.log(`Metadatos aplicados a imagen ${imgFile.index} para email: ${metadata.width}x${metadata.height}`)
       }
     })
+
+    // Actualizar metadatos de videos con información correcta
+    videoFiles.forEach(videoFile => {
+      const metadata = videoMetadata.find(m => m.id === videoFile.index)
+      if (metadata) {
+        videoFile.name = metadata.name || videoFile.name
+        console.log(`Metadatos aplicados a video ${videoFile.index} para email: ${videoFile.name}`)
+      }
+    })
     
     console.log('Datos extraídos para documento:', {
       keys: Object.keys(documentData),
       anexosCount: anexoFiles.length,
-      imagenesCount: imageFiles.length, // Nueva información
+      imagenesCount: imageFiles.length,
+      videosCount: videoFiles.length, // Nueva información
       caseType,
       sampleData: {
         nombreEmpresa: documentData.nombreEmpresa,
@@ -313,6 +353,47 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+
+      // Añadir videos como anexos separados
+      if (videoFiles.length > 0) {
+        console.log(`Procesando ${videoFiles.length} videos como anexos...`)
+        
+        for (let i = 0; i < videoFiles.length; i++) {
+          const video = videoFiles[i]
+          try {
+            const videoBuffer = Buffer.from(await video.file.arrayBuffer())
+            
+            // Crear un nombre de archivo limpio y único
+            const timestamp = Date.now()
+            const fileExtension = video.name.split('.').pop() || 'mp4'
+            const cleanName = video.name.replace(/[^a-zA-Z0-9._-]/g, '_') // Limpiar caracteres especiales
+            const fileName = `video_evidencia_${i + 1}_${timestamp}.${fileExtension}`
+            
+            // Determinar el tipo MIME correcto
+            let contentType = video.type || 'video/mp4'
+            if (!contentType.startsWith('video/')) {
+              contentType = 'video/mp4' // Fallback por defecto
+            }
+            
+            attachments.push({
+              filename: fileName,
+              content: videoBuffer,
+              contentType: contentType
+            })
+            
+            console.log(`Video ${i + 1} procesado:`, {
+              originalName: video.name,
+              fileName: fileName,
+              size: `${(video.size / 1024 / 1024).toFixed(2)}MB`,
+              contentType: contentType
+            })
+            
+          } catch (error) {
+            console.error(`Error procesando video ${video.name}:`, error)
+            // Continuar con los siguientes videos aunque uno falle
+          }
+        }
+      }
       
     } catch (error) {
       console.error('Error procesando documento principal:', error)
@@ -324,8 +405,22 @@ export async function POST(request: NextRequest) {
     
     console.log(`Total de anexos preparados: ${attachments.length}`)
 
-    // Agregar información sobre imágenes al mensaje del email si hay imágenes
-    let emailMessageWithImages = emailMessage
+    // Agregar información sobre imágenes y videos al mensaje del email
+    let emailMessageWithMedia = emailMessage
+
+    {/*
+          // ${imageFiles.length > 0 ? `
+          // <div style="margin-top: 20px; padding: 10px; background-color: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px;">
+          //   <strong>📷 Evidencia Fotográfica:</strong> Este documento incluye ${imageFiles.length} imagen(es) integrada(s) como evidencia de los hechos.
+          // </div>
+          // ` : ''}
+
+          // ${videoFiles.length > 0 ? `
+          // <div style="margin-top: 20px; padding: 10px; background-color: #f3e5f5; border-left: 4px solid #9c27b0; border-radius: 4px;">
+          //   <strong>🎥 Evidencia en Video:</strong> Se incluyen ${videoFiles.length} video(s) como evidencia adicional de los hechos (Total: ${(videoFiles.reduce((total, v) => total + v.size, 0) / 1024 / 1024).toFixed(2)}MB).
+          // </div>
+          // ` : ''}
+      */}
 
     // Configurar el contenido del email
     const mailOptions = {
@@ -334,17 +429,11 @@ export async function POST(request: NextRequest) {
       subject: emailSubject,
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-          ${emailMessageWithImages.replace(/\n/g, '<br>')}
+          ${emailMessageWithMedia.replace(/\n/g, '<br>')}
           
           <div style="margin-top: 30px;">
           <img src="cid:logo" alt="BTL Legal Group" style="max-width: 150px; height: auto;" />
           </div>
-          
-          ${imageFiles.length > 0 ? `
-          <div style="margin-top: 20px; padding: 10px; background-color: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px;">
-            <strong>📷 Evidencia Fotográfica:</strong> Este documento incluye ${imageFiles.length} imagen(es) integrada(s) como evidencia de los hechos.
-          </div>
-          ` : ''}
 
           <div style="margin-top: 30px; padding: 15px; background-color: #f8f9fa; border-left: 4px solid #007bff; font-size: 12px;">
             <strong>AVISO DE CONFIDENCIALIDAD:</strong> El anterior mensaje de correo electrónico y sus anexos contienen información confidencial y, por lo tanto, sujeta a reserva. Si usted no es destinatario del mismo debe proceder a informar mediante correo electrónico a la persona que lo envió y a borrar de su sistema tanto el correo recibido como el enviado, sin conservar copias. En todo caso el uso, difusión, distribución o reproducción del presente mensaje, sin autorización, es prohibido y puede configurar un delito.
@@ -370,7 +459,9 @@ export async function POST(request: NextRequest) {
       to: mailOptions.to,
       subject: mailOptions.subject,
       attachmentsCount: mailOptions.attachments.length,
-      imagenesIncluidas: imageFiles.length
+      imagenesIncluidas: imageFiles.length,
+      videosIncluidos: videoFiles.length,
+      totalSizeVideos: `${(videoFiles.reduce((total, v) => total + v.size, 0) / 1024 / 1024).toFixed(2)}MB`
     })
 
     // Verificar conexión SMTP antes de enviar
@@ -387,7 +478,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Enviar el correo
-    console.log('Enviando correo electrónico con imágenes...')
+    console.log('Enviando correo electrónico con imágenes y videos...')
     let info
     try {
       info = await transporter.sendMail(mailOptions)
@@ -403,6 +494,8 @@ export async function POST(request: NextRequest) {
           errorMessage = 'Error de conexión de red'
         } else if (error.message.includes('Invalid recipients')) {
           errorMessage = 'Direcciones de correo inválidas'
+        } else if (error.message.includes('Message too large') || error.message.includes('size limit')) {
+          errorMessage = 'El correo con los videos excede el límite de tamaño permitido. Considere enviar videos más pequeños o por separado.'
         }
       }
       
@@ -416,28 +509,30 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    console.log('=== RESPUESTA EXITOSA CON IMÁGENES ===')
+    console.log('=== RESPUESTA EXITOSA CON IMÁGENES Y VIDEOS ===')
     
     // Determinar si se hizo merge o se enviaron archivos separados
     const mergedFile = attachments.find(att => att.filename.includes('_COMPLETO'))
     const hasMergedPDF = !!mergedFile
     const hasImages = imageFiles.length > 0
+    const hasVideos = videoFiles.length > 0
     
     const successResponse = { 
       success: true, 
-      message: 'Correo enviado exitosamente con imágenes',
+      message: 'Correo enviado exitosamente con imágenes y videos',
       messageId: info.messageId,
       recipients: emailRecipients.length,
       attachments: {
         total: attachments.length,
         merged: hasMergedPDF,
         images: hasImages ? imageFiles.length : 0,
-        description: hasImages 
-          ? `Documento con ${imageFiles.length} imagen(es) integrada(s)` + 
-            (hasMergedPDF ? ` + PDF combinado con ${anexoFiles.length} anexos` : ` + ${anexoFiles.length} anexos separados`)
-          : hasMergedPDF 
-            ? `PDF combinado con ${anexoFiles.length} anexos integrados`
-            : `${attachments.length} archivos adjuntos (documento principal + ${anexoFiles.length} anexos)`
+        videos: hasVideos ? videoFiles.length : 0,
+        videoSizeMB: hasVideos ? parseFloat((videoFiles.reduce((total, v) => total + v.size, 0) / 1024 / 1024).toFixed(2)) : 0,
+        description: [
+          hasImages ? `Documento con ${imageFiles.length} imagen(es) integrada(s)` : '',
+          hasVideos ? `${videoFiles.length} video(s) de evidencia (${(videoFiles.reduce((total, v) => total + v.size, 0) / 1024 / 1024).toFixed(2)}MB)` : '',
+          hasMergedPDF ? `PDF combinado con ${anexoFiles.length} anexos` : anexoFiles.length > 0 ? `${anexoFiles.length} anexos separados` : ''
+        ].filter(Boolean).join(' + ')
       }
     }
     console.log('Respuesta exitosa:', successResponse)
@@ -461,6 +556,9 @@ export async function POST(request: NextRequest) {
       } else if (error.message.includes('Invalid recipients')) {
         errorMessage = 'Direcciones de correo inválidas'
         statusCode = 400
+      } else if (error.message.includes('Message too large') || error.message.includes('size limit')) {
+        errorMessage = 'El correo con los videos excede el límite de tamaño permitido'
+        statusCode = 413
       }
     }
     

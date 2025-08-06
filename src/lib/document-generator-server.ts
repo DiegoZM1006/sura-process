@@ -174,7 +174,7 @@ const prepareTemplateData = async (formData: any, caseType: string, tabContents?
     // Información económica y póliza (usando los nombres del formulario)
     cuantia: formatCurrency(formData.cuantia),
     numeroPolizaSura: formatValue(formData.numeroPolizaSura, 'XXXXXXXXXX'),
-    deducible: formatCurrency(formData.deducible, '0'),
+    deducible: formatCurrency(formData.deducible),
     
     // Contenido de anexos y hechos editado por el usuario
     anexos: anexosContent,
@@ -215,6 +215,15 @@ const getDefaultAnexosContent = (formData: any = {}, caseType: string = "") => {
 
 6. Certificación bancaria de ${propietarioPrimerVehiculo}`;
 
+    case 'RCE DAÑOS':
+      return `1. Aviso de siniestro de póliza ${numeroPoliza} expedida por Seguros Generales Sura S.A.
+
+2. Registro fotográfico dispuesto en el Artículo 16 de la Ley 2251 del 2022 / IPAT.
+
+3. Constancia de pago de daños materiales del vehículo asegurado por Sura S.A.
+
+4. Copia simple de la Escritura Pública No. 392 del 12 de abril de 2016, a través del cual se otorga la representación legal general al suscrito.`;
+
     case 'RCE DAÑOS + OBJECION':
       return `1.Aviso de siniestro de póliza ${numeroPoliza} expedida por Seguros Generales Sura S.A.
 
@@ -225,23 +234,25 @@ const getDefaultAnexosContent = (formData: any = {}, caseType: string = "") => {
 4.Copia simple de la Escritura Pública No. 392 del 12 de abril de 2016, a través del cual se otorga la representación legal general al suscrito.
 
 5. Copia de objeción por parte de la aseguradora.`;
-      
-    case 'RCE DAÑOS + DEDUCIBLE':
+
+    case 'RCE HURTO + DEDUCIBLE':
       return `1.Aviso de siniestro de póliza ${numeroPoliza}  expedida por Seguros Generales Sura S.A.
 
-2.Pago de deducible del vehículo ${placasPrimerVehiculo} asumido por ${propietarioPrimerVehiculo}
+2.Factura de pago de deducible del vehículo ${placasPrimerVehiculo} asumido por ${propietarioPrimerVehiculo}
 
-3.Registro fotográfico dispuesto en el Artículo 16 de la Ley 2251 del 2022 / IPAT.
+3.Poder de asegurado autorizando reclamación del deducible. 
 
-4.Poder de asegurado autorizando reclamación del deducible. 
+4.Copia de documento de identidad de asegurado por Seguros generales Sura
 
-5.Copia de documento de identidad de asegurado por Seguros generales Sura
+5.Certificación bancaria de ${propietarioPrimerVehiculo}
 
-6.Constancia de pago y factura de daños materiales del vehículo asegurado por Sura S.A.
+6.Registro fotográfico dispuesto en el Artículo 16 de la Ley 2251 del 2022 / IPAT.
 
-7.Copia simple de la Escritura Pública No. 392 del 12 de abril de 2016, a través del cual se otorga la representación legal general al suscrito.`;
+7.Constancia de pago de daños materiales del vehículo asegurado por Sura S.A.
 
-case 'RCE DAÑOS + DEDUCIBLE + OBJECION':
+8.Copia simple de la Escritura Pública No. 392 del 12 de abril de 2016, a través del cual se otorga la representación legal general al suscrito.`;
+
+    case 'RCE DAÑOS + DEDUCIBLE + OBJECION':
       return `1.Aviso de siniestro de póliza ${numeroPoliza} expedida por Seguros Generales Sura S.A.
 
 2.Pago de deducible del vehículo ${placasPrimerVehiculo} asumido por ${propietarioPrimerVehiculo}
@@ -273,15 +284,41 @@ case 'RCE DAÑOS + DEDUCIBLE + OBJECION':
 
 7.Certificación bancaria de ${empresaTenedora}`;
 
-    case 'RCE DAÑOS':
-    default:
-      return `1. Aviso de siniestro de póliza ${numeroPoliza} expedida por Seguros Generales Sura S.A.
+    case 'RCE HURTO':
+      return `1.Aviso de siniestro de póliza ${numeroPoliza} expedida por Seguros Generales Sura S.A.
 
-2. Registro fotográfico dispuesto en el Artículo 16 de la Ley 2251 del 2022 / IPAT.
+2.Factura de pago de deducible del vehículo ${placasPrimerVehiculo} asumido por ${propietarioPrimerVehiculo}
 
-3. Constancia de pago de daños materiales del vehículo asegurado por Sura S.A.
+3.Poder de asegurado autorizando reclamación del deducible. 
 
-4. Copia simple de la Escritura Pública No. 392 del 12 de abril de 2016, a través del cual se otorga la representación legal general al suscrito.`;
+4.Copia de documento de identidad de asegurado por Seguros generales Sura
+
+5.Certificación bancaria de ${propietarioPrimerVehiculo}
+
+6.Registro fotográfico dispuesto en el Artículo 16 de la Ley 2251 del 2022 / IPAT.
+
+7.Constancia de pago y factura de daños materiales del vehículo asegurado por Sura S.A.
+
+8.Copia simple de la Escritura Pública No. 392 del 12 de abril de 2016, a través del cual se otorga la representación legal general al suscrito.
+
+9. Copia de objeción por parte de la aseguradora.`;
+
+    case 'RCE DAÑOS + DEDUCIBLE':
+      return `1.Aviso de siniestro de póliza ${numeroPoliza}  expedida por Seguros Generales Sura S.A.
+
+2.Pago de deducible del vehículo ${placasPrimerVehiculo} asumido por ${propietarioPrimerVehiculo}
+
+3.Registro fotográfico dispuesto en el Artículo 16 de la Ley 2251 del 2022 / IPAT.
+
+4.Poder de asegurado autorizando reclamación del deducible. 
+
+5.Copia de documento de identidad de asegurado por Seguros generales Sura
+
+6.Constancia de pago y factura de daños materiales del vehículo asegurado por Sura S.A.
+
+7.Copia simple de la Escritura Pública No. 392 del 12 de abril de 2016, a través del cual se otorga la representación legal general al suscrito.`;
+
+    default: 'ELIGE UN TIPO DE CASO PARA GENERAR LOS ANEXOS';
   }
 };
 
@@ -306,7 +343,9 @@ const getDefaultHechosContent = (formData: any = {}, caseType: string = "") => {
   const horaAccidente = formData.horaAccidente || '{horaAccidente}';
   const direccionEmpresa = formData.direccionEmpresa || '{direccionEmpresa}';
   const ciudadEmpresa = formData.ciudadEmpresa || '{ciudadEmpresa}';
-  const empresaTenedora = formData.empresaTenedora || '{empresaTenedora}'
+  const empresaTenedora = formData.empresaTenedora || '{empresaTenedora}';
+  const nombreAseguradora =  formData.nombreAseguradora || '{nombreAsegurado}';
+  const nombreEmpresa = formData.nombreEmpresa || '{nombreEmpresa}';
 
   // Lógica para combinar propietario y afiliador
   let propietarioYAfiliador;
@@ -321,6 +360,15 @@ const getDefaultHechosContent = (formData: any = {}, caseType: string = "") => {
   }
 
   switch (caseType) {
+    case 'RCE DAÑOS':
+      return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en la ${direccionAccidente}, de la ciudad de ${ciudad}, ${departamento}; se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} de propiedad de ${propietarioPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${propietarioYAfiliador} conducido por ${conductorVehiculoInfractor} identificado con cédula de ciudadanía ${cedulaConductorInfractor}.
+
+2. Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.
+
+3. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
+
+4. Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia} por concepto de reparación de los daños materiales sufridos al vehículo de placas ${placasPrimerVehiculo}.`;
+
     case 'RCE SOLO DEDUCIBLE':
       return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en la ${direccionAccidente} ${ciudad}, ${departamento} se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} de propiedad de ${propietarioPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} afiliado a la empresa de transportes ${afiliador} conducido por ${conductorVehiculoInfractor}
 
@@ -354,19 +402,6 @@ const getDefaultHechosContent = (formData: any = {}, caseType: string = "") => {
 
 5.Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia} por concepto de pérdida total sufridos al vehículo de placas ${placasPrimerVehiculo} .`
 
-    case 'RCE HURTO + DEDUCIBLE':
-      return `1.El 30 de abril de 2024, el señor ${propietarioPrimerVehiculo} se dispuso a parquear el vehículo de placas ${placasPrimerVehiculo} en el parqueadero de TIERRACOLINA ubicado en la ${direccionEmpresa} de la ciudad de ${ciudadEmpresa}
-
-2.En la misma fecha, a eso de las ${horaAccidente} aproximadamente, el señor ${propietarioPrimerVehiculo} se entera que su vehículo le habían hurtado los espejos retrovisores en el parqueadero, indicado asi en la denuncia anexada:
-
-3.Como consecuencia de los hechos, el señor ${propietarioPrimerVehiculo}, se dirige al personal de seguridad del parqueadero para reportar lo ocurrido; así mismo, procedió a comunicarse con la policía del cuadrante y presenta la denuncia. Revisadas las cámaras se evidencia ingreso al edificio de sujeto desconocido en “modalidad de trencito” el cual baja al sótano y roba los espejos del vehículo ${placasPrimerVehiculo}.
-
-4.El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del hurto por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
-
-5.De conformidad con el aviso de reclamo y la documentación que soporta el siniestro, la compañía de Seguros Generales Sura S.A., se afectó el amparo por hurto parcial y se procedió a indemnizar al señor ${propietarioPrimerVehiculo} por el valor de $ ${cuantia}
-
-6.Asimismo, el señor ${propietarioPrimerVehiculo} canceló la suma de $ ${deducible} pesos por concepto del deducible por el amparo afectado.`;
-
     case 'RCE DAÑOS + DEDUCIBLE + OBJECION':
       return `1.El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en ${direccionAccidente} en el sector del peaje ${ciudad}, se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${propietarioSegundoVehiculo} afiliado a la empresa de transporte ${afiliador}
 
@@ -383,7 +418,7 @@ const getDefaultHechosContent = (formData: any = {}, caseType: string = "") => {
   “ Se aplica el deducible pactado en la póliza para el amparo DBT de 2.600.000, motivo por el cual, el valor de la perdida es absorbido por el deducible pactado en la póliza.”
 `;
 
-case 'RCE SOLO DEDUCIBLE + OBJECION':
+    case 'RCE SOLO DEDUCIBLE + OBJECION':
       return `1.El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en ${direccionEmpresa} ${ciudad}, ${departamento}  se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} de propiedad de ${propietarioPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} afiliado a la empresa de transportes ${afiliador} conducido por ${conductorVehiculoInfractor}
 
 2.Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.
@@ -398,17 +433,40 @@ case 'RCE SOLO DEDUCIBLE + OBJECION':
 
   “Como quiera, que el monto del deducible ($ ${deducible}) supera la cuantía solicitada ($ ${cuantia}), lamentamos informarle que no hay lugar a indemnización alguna bajo la presente póliza. Con fundamento en lo anterior, nos permitimos informar que no es posible atender favorablemente su solicitud, y por lo tanto, {nombreAseguradora} OBJETA formal e íntegramente su reclamación. “
 
-Es decir que, como el contrato de póliza de {nombreEmpresa} incluye un deducible del mismo valor por el cual se pretende, en esos casos lo deberá asumir directamente su asegurado.`;
+Es decir que, como el contrato de póliza de ${nombreEmpresa} incluye un deducible del mismo valor por el cual se pretende, en esos casos lo deberá asumir directamente su asegurado.`;
 
-    case 'RCE DAÑOS':
+    case 'RCE HURTO':
+      return `1.El ${diaAccidente} de ${mesAccidente} del ${añoAccidente}, el señor ${propietarioPrimerVehiculo} se dispuso a parquear el vehículo de placas ${placasPrimerVehiculo} en ${nombreEmpresa} ubicado en ${direccionEmpresa} de la ciudad de ${ciudad}
+
+2.El ${diaAccidente}/${mesAccidente}/${añoAccidente}, el señor ${propietarioPrimerVehiculo} se entera que su vehículo había sido hurtado, siendo parte de los hechos de la denuncia anexada al presente escrito:
+
+3.De acuerdo a los registros videográficos, el vehículo fue hurtado de las instalaciones del parqueadero en horas de la madrugada.
+
+4.El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del hurto por la póliza de seguros expedida por Seguros Generales Suramericana.
+
+5.De conformidad con el aviso de reclamo y la documentación que soporta el siniestro, la compañía de Seguros Generales Sura S.A., afectó el amparo por hurto y se procedió a indemnizar a ${propietarioPrimerVehiculo} por el valor de $ ${cuantia}
+
+6.Asimismo, ${propietarioPrimerVehiculo} canceló la suma de $ ${deducible} pesos por concepto del deducible por el amparo afectado.
+
+7. En consecuencia, se presentó reclamación de responsabilidad civil ante la aseguradora ${nombreAseguradora} frente al siniestro en mención, no obstante, objetan, manifestando que:
+
+Es decir que, la póliza contratada excluye dentro de su protección eventos como el hurto, estando éste fuera de su cobertura.`;
+
+    case 'RCE HURTO + DEDUCIBLE':
+      return `1.El 30 de abril de 2024, el señor ${propietarioPrimerVehiculo} se dispuso a parquear el vehículo de placas ${placasPrimerVehiculo} en el parqueadero de TIERRACOLINA ubicado en la ${direccionEmpresa} de la ciudad de ${ciudadEmpresa}
+
+2.En la misma fecha, a eso de las ${horaAccidente} aproximadamente, el señor ${propietarioPrimerVehiculo} se entera que su vehículo le habían hurtado los espejos retrovisores en el parqueadero, indicado asi en la denuncia anexada:
+
+3.Como consecuencia de los hechos, el señor ${propietarioPrimerVehiculo}, se dirige al personal de seguridad del parqueadero para reportar lo ocurrido; así mismo, procedió a comunicarse con la policía del cuadrante y presenta la denuncia. Revisadas las cámaras se evidencia ingreso al edificio de sujeto desconocido en “modalidad de trencito” el cual baja al sótano y roba los espejos del vehículo ${placasPrimerVehiculo}.
+
+4.El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del hurto por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
+
+5.De conformidad con el aviso de reclamo y la documentación que soporta el siniestro, la compañía de Seguros Generales Sura S.A., se afectó el amparo por hurto parcial y se procedió a indemnizar al señor ${propietarioPrimerVehiculo} por el valor de $ ${cuantia}
+
+6.Asimismo, el señor ${propietarioPrimerVehiculo} canceló la suma de $ ${deducible} pesos por concepto del deducible por el amparo afectado.`;
+
     default:
-      return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en la ${direccionAccidente}, de la ciudad de ${ciudad}, ${departamento}; se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} de propiedad de ${propietarioPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${propietarioYAfiliador} conducido por ${conductorVehiculoInfractor} identificado con cédula de ciudadanía ${cedulaConductorInfractor}.
-
-2. Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.
-
-3. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
-
-4. Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia} por concepto de reparación de los daños materiales sufridos al vehículo de placas ${placasPrimerVehiculo}.`;
+      return getDefaultHechosContent(formData, 'RCE DAÑOS');
   }
 };
 

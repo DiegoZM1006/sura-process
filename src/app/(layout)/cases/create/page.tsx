@@ -169,7 +169,7 @@ export default function CreateCasePage() {
         <div className="h-full flex flex-col">
             {/* Header con Stepper */}
             <div className="border-b bg-white p-6">
-                <h1 className="text-2xl font-bold mb-6">Crear Nuevo Caso</h1>
+                <h1 className="text-2xl font-bold mb-6">Crear Nuevo Caso ({caseType || 'Cargando caso...'})</h1>
 
                 {/* Stepper funcional */}
                 <nav aria-label="Progress">

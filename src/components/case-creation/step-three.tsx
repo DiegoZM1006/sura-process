@@ -22,6 +22,7 @@ interface EmailData {
   subject: string
   message: string
   nombreEmpresa: string
+  videos: File[]
 }
 
 export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formData, documentImages = [] }: StepThreeProps) {
@@ -185,6 +186,26 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
           if (img.file) {
             formDataWithEmail.append(`imagen_${index}`, img.file, img.name)
           }
+        })
+      }
+
+      // Agregar los videos de evidencia
+      if (emailData.videos && emailData.videos.length > 0) {
+        console.log('Agregando videos al email:', emailData.videos.length)
+        
+        // Agregar metadatos de los videos
+        const videoMetadata = emailData.videos.map((video, index) => ({
+          id: index,
+          name: video.name,
+          size: video.size,
+          type: video.type
+        }))
+        formDataWithEmail.append('videosMetadata', JSON.stringify(videoMetadata))
+        
+        // Agregar cada archivo de video
+        emailData.videos.forEach((video, index) => {
+          formDataWithEmail.append(`video_${index}`, video, video.name)
+          console.log(`Video ${index} agregado: ${video.name} (${(video.size / 1024 / 1024).toFixed(2)}MB)`)
         })
       }
       
