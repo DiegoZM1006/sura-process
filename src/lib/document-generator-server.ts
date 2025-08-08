@@ -18,6 +18,20 @@ import libre from 'libreoffice-convert'
 // Importar el módulo de imágenes gratuito
 import ImageModule from 'docxtemplater-image-module-free'
 
+// Tipo para un hecho individual
+interface Hecho {
+  id: string;
+  descripcionHecho: string;
+  fotoHecho?: {
+    id: string;
+    name: string;
+    data: string;
+    file: File;
+    width: number;
+    height: number;
+  } | null;
+}
+
 // Función para formatear fechas en español
 const formatDateSpanish = (dateValue: string) => {
   if (!dateValue) return 'XXX de XXXX del 2024'
@@ -64,8 +78,106 @@ function base64DataURLToArrayBuffer(dataURL: string) {
   return bytes.buffer;
 }
 
-// Función para preparar los datos para la plantilla
-const prepareTemplateData = async (formData: any, caseType: string, tabContents?: any, imageFiles?: any[]) => {
+// Función para procesar hechos estructurados desde FormData
+const processHechosFromFormData = (formData: any): Hecho[] => {
+  try {
+    if (formData.hechos && typeof formData.hechos === 'string') {
+      const hechosData = JSON.parse(formData.hechos) as Hecho[]
+      console.log('Hechos procesados desde FormData:', hechosData.length)
+      return hechosData
+    }
+    return []
+  } catch (error) {
+    console.error('Error procesando hechos desde FormData:', error)
+    return []
+  }
+}
+
+// Función para procesar imágenes de hechos desde FormData
+const processHechoImagesFromFormData = async (formData: any, hechos: Hecho[]): Promise<Hecho[]> => {
+  try {
+    const processedHechos = [...hechos]
+    
+    // Buscar archivos de imágenes de hechos en el FormData
+    let imageIndex = 0
+    while (formData[`hecho_imagen_${imageIndex}`]) {
+      const imageFile = formData[`hecho_imagen_${imageIndex}`]
+      
+      if (imageFile && typeof imageFile === 'object') {
+        // Convertir el archivo a data URL
+        const buffer = await imageFile.arrayBuffer()
+        const uint8Array = new Uint8Array(buffer)
+        const base64 = Buffer.from(uint8Array).toString('base64')
+        const mimeType = imageFile.type || 'image/jpeg'
+        const dataUrl = `data:${mimeType};base64,${base64}`
+        
+        // Buscar el hecho correspondiente que no tenga imagen aún
+        const hechoIndex = processedHechos.findIndex(h => h.fotoHecho === null || h.fotoHecho === undefined)
+        
+        if (hechoIndex >= 0) {
+          processedHechos[hechoIndex] = {
+            ...processedHechos[hechoIndex],
+            fotoHecho: {
+              id: `processed_${Date.now()}_${imageIndex}`,
+              name: imageFile.name || `imagen_hecho_${imageIndex}.jpg`,
+              data: dataUrl,
+              file: imageFile,
+              width: 400, // Dimensiones por defecto
+              height: 300
+            }
+          }
+          
+          console.log(`Imagen de hecho ${imageIndex} procesada y asignada al hecho ${hechoIndex}`)
+        }
+      }
+      
+      imageIndex++
+    }
+    
+    console.log('Hechos con imágenes procesados:', processedHechos.filter(h => h.fotoHecho).length)
+    return processedHechos
+    
+  } catch (error) {
+    console.error('Error procesando imágenes de hechos:', error)
+    return hechos
+  }
+}
+
+// Función para generar hechos de fallback basados en el contenido por defecto
+const generateFallbackHechos = (formData: any, caseType: string): Hecho[] => {
+  console.log('Generando hechos de fallback para tipo:', caseType);
+  
+  try {
+    const hechosTexto = getDefaultHechosContent(formData, caseType);
+    // Dividir los hechos por números (1., 2., 3., etc.) y limpiar
+    const hechosArray = hechosTexto
+      .split(/\d+\./)
+      .filter(h => h.trim().length > 0)
+      .map(h => h.trim());
+    
+    return hechosArray.map((hecho, index) => ({
+      id: `fallback_${Date.now()}_${index}`,
+      descripcionHecho: hecho,
+      fotoHecho: null
+    }));
+  } catch (error) {
+    console.error('Error generando hechos de fallback:', error);
+    return [{
+      id: `error_${Date.now()}`,
+      descripcionHecho: 'Error al generar los hechos automáticamente. Por favor, complete manualmente.',
+      fotoHecho: null
+    }];
+  }
+}
+
+// Función para preparar los datos para la plantilla - ACTUALIZADA PARA HECHOS COMO LOOP
+const prepareTemplateData = async (
+  formData: any, 
+  caseType: string, 
+  tabContents?: any, 
+  hechosEstructurados?: Hecho[], 
+  imageFiles?: any[]
+) => {
   // Obtener fecha actual formateada
   const fechaActual = new Date()
   const fechaHoy = formatDateSpanish(fechaActual.toISOString())
@@ -87,18 +199,56 @@ const prepareTemplateData = async (formData: any, caseType: string, tabContents?
   // Preparar contenido de anexos según el tipo de caso
   const anexosContent = tabContents?.anexos || formData.contenidoAnexos || getDefaultAnexosContent(formData, caseType)
   
-  // Preparar contenido de hechos según el tipo de caso
-  const hechosContent = tabContents?.hechos || formData.contenidoHechos || getDefaultHechosContent(formData, caseType);
+  // PROCESAR HECHOS COMO LOOP ESTRUCTURADO
+  let hechosParaLoop: any[] = []
+  
+  if (hechosEstructurados && hechosEstructurados.length > 0) {
+    console.log('Procesando hechos estructurados para loop:', hechosEstructurados.length)
+    
+    hechosParaLoop = hechosEstructurados.map((hecho, index) => {
+      const hechoParaTemplate = {
+        descripcionHecho: hecho.descripcionHecho || `Hecho ${index + 1}`,
+        fotoHecho: null as any
+      }
+      
+      // Si el hecho tiene una foto, preparar para docxtemplater
+      if (hecho.fotoHecho && hecho.fotoHecho.data) {
+        console.log(`Procesando imagen para hecho ${index}:`, hecho.fotoHecho.name)
+        // Para docxtemplater con el módulo de imágenes, necesitamos pasar el data URL directamente
+        hechoParaTemplate.fotoHecho = hecho.fotoHecho.data
+      }
+      
+      console.log(`Hecho ${index} preparado:`, {
+        descripcion: hechoParaTemplate.descripcionHecho.substring(0, 50) + '...',
+        tieneFoto: !!hechoParaTemplate.fotoHecho
+      })
+      
+      return hechoParaTemplate
+    })
+    
+    console.log('Hechos estructurados preparados para loop:', hechosParaLoop.length)
+  } else {
+    // Si no hay hechos estructurados, generar hechos por defecto
+    console.log('No hay hechos estructurados, generando por defecto para tipo:', caseType)
+    const hechosFallback = generateFallbackHechos(formData, caseType)
+    
+    hechosParaLoop = hechosFallback.map((hecho, index) => ({
+      descripcionHecho: hecho.descripcionHecho,
+      fotoHecho: null // Los hechos por defecto no tienen imágenes
+    }))
+    
+    console.log('Hechos por defecto generados para loop:', hechosParaLoop.length)
+  }
 
-  // Preparar datos de imágenes para docxtemplater
-  let imagenesHechos: any[] = []
+  // Preparar datos de imágenes adicionales para docxtemplater (si las hay - no relacionadas con hechos)
+  let imagenesAdicionales: any[] = []
   
   if (imageFiles && imageFiles.length > 0) {
-    console.log('Procesando múltiples imágenes para plantilla:', imageFiles.length)
+    console.log('Procesando imágenes adicionales para plantilla:', imageFiles.length)
     
-    imagenesHechos = imageFiles.map((imgFile, index) => {
+    imagenesAdicionales = imageFiles.map((imgFile, index) => {
       try {
-        console.log(`Procesando imagen ${index}:`, {
+        console.log(`Procesando imagen adicional ${index}:`, {
           name: imgFile.name,
           width: imgFile.width,
           height: imgFile.height,
@@ -115,22 +265,20 @@ const prepareTemplateData = async (formData: any, caseType: string, tabContents?
             index: index
           }
           
-          console.log(`Imagen ${index} preparada con propiedad 'src'`)
+          console.log(`Imagen adicional ${index} preparada con propiedad 'src'`)
           return imageObj
         }
         
-        console.error(`Imagen ${index} no tiene data URL válido`)
+        console.error(`Imagen adicional ${index} no tiene data URL válido`)
         return null
         
       } catch (error) {
-        console.error(`Error procesando imagen ${index}:`, error)
+        console.error(`Error procesando imagen adicional ${index}:`, error)
         return null
       }
     }).filter(img => img !== null)
     
-    console.log('Imágenes procesadas para plantilla:', imagenesHechos.length)
-  } else {
-    console.log('No hay imágenes para procesar')
+    console.log('Imágenes adicionales procesadas para plantilla:', imagenesAdicionales.length)
   }
 
   const templateData = {
@@ -141,7 +289,7 @@ const prepareTemplateData = async (formData: any, caseType: string, tabContents?
     fechaHoy,
     fechaAccidente: fechaAccidenteCompleta,
 
-    // Información de la empresa/destinatario (usando los nombres del formulario)
+    // Información de la empresa/destinatario
     nombreEmpresa: formatValue(formData.nombreEmpresa, 'XXXXXXXXXXXXXXX'),
     nitEmpresa: formatValue(formData.nitEmpresa, 'XXXXXXXXXXXXXXX'),
     telefonoEmpresa: formatValue(formData.telefonoEmpresa, 'XXXXXXXXXXXXXXX'),
@@ -152,7 +300,7 @@ const prepareTemplateData = async (formData: any, caseType: string, tabContents?
         ? [{ correoEmpresa: formData.correoEmpresa.trim() }]
         : [],
 
-    // Datos del accidente (usando los nombres del formulario)
+    // Datos del accidente
     diaAccidente: formatValue(formData.diaAccidente, 'XX'),
     mesAccidente: formatValue(formData.mesAccidente, 'XXXXXXX'),
     añoAccidente: formatValue(formData.añoAccidente, '2024'),
@@ -160,38 +308,118 @@ const prepareTemplateData = async (formData: any, caseType: string, tabContents?
     ciudad: formatValue(formData.ciudad, 'XXXXX XXXX'),
     departamento: formatValue(formData.departamento, 'XXXXXXXX'),
     
-    // Vehículos involucrados (usando los nombres del formulario)
+    // Vehículos involucrados
     placasPrimerVehiculo: formatValue(formData.placasPrimerVehiculo, 'XXXXX'),
     propietarioPrimerVehiculo: formatValue(formData.propietarioPrimerVehiculo, 'XXXXXXXX'),
     placasSegundoVehiculo: formatValue(formData.placasSegundoVehiculo, 'XXXXXX'),
     propietarioSegundoVehiculo: formatValue(formData.propietarioSegundoVehiculo, 'XXXXXXXX'),
     afiliador: formatValue(formData.afiliador, ''),
     
-    // Conductor infractor (usando los nombres del formulario)
+    // Conductor infractor
     conductorVehiculoInfractor: formatValue(formData.conductorVehiculoInfractor, 'RXXXXXXX'),
     cedulaConductorInfractor: formatValue(formData.cedulaConductorInfractor, '1XXXXXXXX'),
     
-    // Información económica y póliza (usando los nombres del formulario)
+    // Información económica y póliza
     cuantia: formatCurrency(formData.cuantia),
     numeroPolizaSura: formatValue(formData.numeroPolizaSura, 'XXXXXXXXXX'),
     deducible: formatCurrency(formData.deducible),
     
-    // Contenido de anexos y hechos editado por el usuario
+    // Contenido de anexos editado por el usuario
     anexos: anexosContent,
     contenidoAnexos: anexosContent,
-    contenidoHechos: hechosContent,
     
-    // Variable para las imágenes de hechos
-    imagenesHechos: imagenesHechos,
+    // HECHOS ESTRUCTURADOS PARA EL LOOP - ESTA ES LA CLAVE
+    // Usar exactamente esta estructura para que docxtemplater procese el loop
+    hechos: hechosParaLoop,
+    
+    // Imágenes adicionales (si las hay - no relacionadas con hechos)
+    imagenesAdicionales: imagenesAdicionales,
   }
 
   console.log('Template data preparado para tipo:', caseType, {
     ...templateData,
-    imagenesHechos: imagenesHechos.length > 0 ? `${imagenesHechos.length} imágenes con propiedad src` : 'No hay imágenes'
+    hechos: `${hechosParaLoop.length} hechos preparados para loop`,
+    hechosConFotos: hechosParaLoop.filter(h => h.fotoHecho).length,
+    imagenesAdicionales: imagenesAdicionales.length > 0 ? `${imagenesAdicionales.length} imágenes adicionales` : 'Sin imágenes adicionales'
   })
 
   return templateData
 }
+
+// Función principal actualizada para procesar desde FormData
+export const generateDocumentFromFormData = async (
+  formData: any,
+  caseType: string
+): Promise<Blob> => {
+  try {
+    console.log('=== PROCESANDO DATOS DESDE FORM DATA PARA HECHOS COMO LOOP ===')
+    
+    // 1. Procesar hechos estructurados desde FormData
+    let hechos = processHechosFromFormData(formData)
+    console.log('Hechos extraídos:', hechos.length)
+    
+    // 2. Si no hay hechos válidos, generar hechos de fallback
+    if (!hechos || hechos.length === 0) {
+      console.log('No hay hechos estructurados, generando fallback...')
+      hechos = generateFallbackHechos(formData, caseType)
+    }
+    
+    // 3. Procesar imágenes de hechos
+    const hechosConImagenes = await processHechoImagesFromFormData(formData, hechos)
+    console.log('Hechos con imágenes procesados:', hechosConImagenes.filter(h => h.fotoHecho).length)
+    
+    // 4. Procesar contenidos de tabs
+    const tabContents = {
+      anexos: formData.contenidoAnexos || getDefaultAnexosContent(formData, caseType),
+    }
+    
+    // 5. Procesar imágenes adicionales (las que no son de hechos)
+    const imagenesAdicionales: any[] = []
+    if (formData.imagenesMetadata) {
+      try {
+        const metadata = JSON.parse(formData.imagenesMetadata)
+        for (let i = 0; i < metadata.length; i++) {
+          const imageFile = formData[`imagen_${i}`]
+          if (imageFile && typeof imageFile === 'object') {
+            const buffer = await imageFile.arrayBuffer()
+            const uint8Array = new Uint8Array(buffer)
+            const base64 = Buffer.from(uint8Array).toString('base64')
+            const mimeType = imageFile.type || 'image/jpeg'
+            const dataUrl = `data:${mimeType};base64,${base64}`
+            
+            imagenesAdicionales.push({
+              id: metadata[i].id,
+              name: metadata[i].name,
+              data: dataUrl,
+              file: imageFile,
+              width: metadata[i].width || 400,
+              height: metadata[i].height || 300
+            })
+          }
+        }
+        console.log('Imágenes adicionales procesadas:', imagenesAdicionales.length)
+      } catch (error) {
+        console.error('Error procesando imágenes adicionales:', error)
+      }
+    }
+    
+    // 6. Generar el documento usando la función actualizada
+    return await generateDocumentBlobServer(
+      formData,
+      caseType,
+      tabContents,
+      hechosConImagenes,
+      imagenesAdicionales
+    )
+    
+  } catch (error) {
+    console.error('Error en generateDocumentFromFormData:', error)
+    throw error
+  }
+}
+
+// Resto del código permanece igual...
+// (getDefaultAnexosContent, getDefaultHechosContent, etc.)
 
 // Función para obtener contenido por defecto de anexos según el tipo de caso
 const getDefaultAnexosContent = (formData: any = {}, caseType: string = "") => {
@@ -370,7 +598,7 @@ const getDefaultHechosContent = (formData: any = {}, caseType: string = "") => {
 4. Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia} por concepto de reparación de los daños materiales sufridos al vehículo de placas ${placasPrimerVehiculo}.`;
 
     case 'RCE SOLO DEDUCIBLE':
-      return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en la ${direccionAccidente} ${ciudad}, ${departamento} se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} de propiedad de ${propietarioPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} afiliado a la empresa de transportes ${afiliador} conducido por ${conductorVehiculoInfractor}
+      return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en la ${direccionAccidente} ${ciudad}, ${departamento} se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} de propiedad de ${propietarioPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} afiliado a la empresa de transportes ${afiliador} conducido por ${conductorVehiculoInfractor}.
 
 2. Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.
 
@@ -381,37 +609,37 @@ const getDefaultHechosContent = (formData: any = {}, caseType: string = "") => {
 5. Para que el vehículo de placas ${placasPrimerVehiculo} fuese reparado, ${propietarioPrimerVehiculo} locatario y tenedor material del vehículo debió asumir el valor de un deducible por la suma de $ ${cuantia} (de lo cual quedó constancia en la factura anexada al presente documento.`;
 
     case 'RCE DAÑOS + OBJECION':
-      return `1.El ${diaAccidente} de ${mesAccidente} del ${añoAccidente}  en ${direccionAccidente} de la ciudad de ${ciudad}.; se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${afiliador}
+      return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente}  en ${direccionAccidente} de la ciudad de ${ciudad}.; se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${afiliador}.
 
-2.Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo} 
+2. Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.
 
-3.El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
+3. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
 
-4.Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia}  por concepto de daños sufridos al vehículo de placas ${placasPrimerVehiculo}.
+4. Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia} por concepto de daños sufridos al vehículo de placas ${placasPrimerVehiculo}.
 
 5. En consecuencia, se presentó reclamación de responsabilidad civil ante la aseguradora MUNDIAL frente al siniestro en mención, no obstante, objetan la reclamación, dejando sin cobertura al vehículo del tercero responsable.`;
 
     case 'RCE DAÑOS + DEDUCIBLE':
-      return `1.El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en ${direccionAccidente}, ${departamento}, se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${propietarioSegundoVehiculo}  afiliado a la empresa de transporte ${afiliador}
+      return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en ${direccionAccidente}, ${departamento}, se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${propietarioSegundoVehiculo}  afiliado a la empresa de transporte ${afiliador}.
 
-2.Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}
+2. Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.
 
-3.El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura}; expedida por Seguros Generales Suramericana.
+3. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura}; expedida por Seguros Generales Suramericana.
 
-4.Para que el vehículo de placas ${placasPrimerVehiculo} fuese reparado, ${propietarioPrimerVehiculo} debió asumir el valor de un deducible por la suma de $ ${deducible} de lo cual quedó constancia en la factura anexada al presente documento.
+4. Para que el vehículo de placas ${placasPrimerVehiculo} fuese reparado, ${propietarioPrimerVehiculo} debió asumir el valor de un deducible por la suma de $ ${deducible} de lo cual quedó constancia en la factura anexada al presente documento.
 
-5.Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia} por concepto de pérdida total sufridos al vehículo de placas ${placasPrimerVehiculo} .`
+5. Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia} por concepto de pérdida total sufridos al vehículo de placas ${placasPrimerVehiculo}.`
 
     case 'RCE DAÑOS + DEDUCIBLE + OBJECION':
-      return `1.El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en ${direccionAccidente} en el sector del peaje ${ciudad}, se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${propietarioSegundoVehiculo} afiliado a la empresa de transporte ${afiliador}
+      return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en ${direccionAccidente} en el sector del peaje ${ciudad}, se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${propietarioSegundoVehiculo} afiliado a la empresa de transporte ${afiliador}.
 
-2.Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}
+2. Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.
 
-3.El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
+3. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
 
-4.Para que el vehículo de placas ${placasPrimerVehiculo} fuese reparado, ${propietarioPrimerVehiculo} debió asumir el valor de un deducible por la suma de $ ${deducible} de lo cual quedó constancia en la factura anexada al presente documento.
+4. Para que el vehículo de placas ${placasPrimerVehiculo} fuese reparado, ${propietarioPrimerVehiculo} debió asumir el valor de un deducible por la suma de $ ${deducible} de lo cual quedó constancia en la factura anexada al presente documento.
 
-5.Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ {cuantia} por concepto de pérdida total sufridos al vehículo de placas ${placasPrimerVehiculo}.
+5. Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia} por concepto de pérdida total sufridos al vehículo de placas ${placasPrimerVehiculo}.
 
 6. En consecuencia, se presentó reclamación de responsabilidad civil ante la aseguradora SEGUROS DEL ESTADO frente al siniestro en mención, no obstante, objetan manifestando:
 
@@ -419,51 +647,50 @@ const getDefaultHechosContent = (formData: any = {}, caseType: string = "") => {
 `;
 
     case 'RCE SOLO DEDUCIBLE + OBJECION':
-      return `1.El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en ${direccionEmpresa} ${ciudad}, ${departamento}  se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} de propiedad de ${propietarioPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} afiliado a la empresa de transportes ${afiliador} conducido por ${conductorVehiculoInfractor}
+      return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en ${direccionEmpresa} ${ciudad}, ${departamento}  se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} de propiedad de ${propietarioPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} afiliado a la empresa de transportes ${afiliador} conducido por ${conductorVehiculoInfractor}.
 
-2.Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.
+2. Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.
 
-3.El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
+3. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
 
-4.Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma por concepto de reparación de los daños materiales sufridos por el vehículo de placas ${placasPrimerVehiculo}.
+4. Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma por concepto de reparación de los daños materiales sufridos por el vehículo de placas ${placasPrimerVehiculo}.
 
-5.Para que el vehículo de placas ${placasPrimerVehiculo} fuese reparado, ${empresaTenedora} locatario y tenedor material del vehículo debió asumir el valor de un deducible por la suma de $ ${deducible} de lo cual quedó constancia en la factura anexada al presente documento.
+5. Para que el vehículo de placas ${placasPrimerVehiculo} fuese reparado, ${empresaTenedora} locatario y tenedor material del vehículo debió asumir el valor de un deducible por la suma de $ ${deducible} de lo cual quedó constancia en la factura anexada al presente documento.
 
-6.En concordancia con el pago de la aseguradora {nombreAseguradora}, se realizó reclamo por concepto de deducible, no obstante, fue objetado por:
+6. En concordancia con el pago de la aseguradora ${nombreAseguradora}, se realizó reclamo por concepto de deducible, no obstante, fue objetado por:
 
   “Como quiera, que el monto del deducible ($ ${deducible}) supera la cuantía solicitada ($ ${cuantia}), lamentamos informarle que no hay lugar a indemnización alguna bajo la presente póliza. Con fundamento en lo anterior, nos permitimos informar que no es posible atender favorablemente su solicitud, y por lo tanto, {nombreAseguradora} OBJETA formal e íntegramente su reclamación. “
 
 Es decir que, como el contrato de póliza de ${nombreEmpresa} incluye un deducible del mismo valor por el cual se pretende, en esos casos lo deberá asumir directamente su asegurado.`;
 
     case 'RCE HURTO':
-      return `1.El ${diaAccidente} de ${mesAccidente} del ${añoAccidente}, el señor ${propietarioPrimerVehiculo} se dispuso a parquear el vehículo de placas ${placasPrimerVehiculo} en ${nombreEmpresa} ubicado en ${direccionEmpresa} de la ciudad de ${ciudad}
+      return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente}, el señor ${propietarioPrimerVehiculo} se dispuso a parquear el vehículo de placas ${placasPrimerVehiculo} en ${nombreEmpresa} ubicado en ${direccionEmpresa} de la ciudad de ${ciudad}.
 
-2.El ${diaAccidente}/${mesAccidente}/${añoAccidente}, el señor ${propietarioPrimerVehiculo} se entera que su vehículo había sido hurtado, siendo parte de los hechos de la denuncia anexada al presente escrito:
+2. El ${diaAccidente}/${mesAccidente}/${añoAccidente}, el señor ${propietarioPrimerVehiculo} se entera que su vehículo había sido hurtado, siendo parte de los hechos de la denuncia anexada al presente escrito.
 
-3.De acuerdo a los registros videográficos, el vehículo fue hurtado de las instalaciones del parqueadero en horas de la madrugada.
+3. De acuerdo a los registros videográficos, el vehículo fue hurtado de las instalaciones del parqueadero en horas de la madrugada.
 
-4.El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del hurto por la póliza de seguros expedida por Seguros Generales Suramericana.
+4. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del hurto por la póliza de seguros expedida por Seguros Generales Suramericana.
 
-5.De conformidad con el aviso de reclamo y la documentación que soporta el siniestro, la compañía de Seguros Generales Sura S.A., afectó el amparo por hurto y se procedió a indemnizar a ${propietarioPrimerVehiculo} por el valor de $ ${cuantia}
+5. De conformidad con el aviso de reclamo y la documentación que soporta el siniestro, la compañía de Seguros Generales Sura S.A., afectó el amparo por hurto y se procedió a indemnizar a ${propietarioPrimerVehiculo} por el valor de $ ${cuantia}.
 
-6.Asimismo, ${propietarioPrimerVehiculo} canceló la suma de $ ${deducible} pesos por concepto del deducible por el amparo afectado.
+6. Asimismo, ${propietarioPrimerVehiculo} canceló la suma de $ ${deducible} pesos por concepto del deducible por el amparo afectado.
 
-7. En consecuencia, se presentó reclamación de responsabilidad civil ante la aseguradora ${nombreAseguradora} frente al siniestro en mención, no obstante, objetan, manifestando que:
-
-Es decir que, la póliza contratada excluye dentro de su protección eventos como el hurto, estando éste fuera de su cobertura.`;
+7. En consecuencia, se presentó reclamación de responsabilidad civil ante la aseguradora ${nombreAseguradora} frente al siniestro en mención, no obstante, objetan, manifestando que.
+`;
 
     case 'RCE HURTO + DEDUCIBLE':
-      return `1.El 30 de abril de 2024, el señor ${propietarioPrimerVehiculo} se dispuso a parquear el vehículo de placas ${placasPrimerVehiculo} en el parqueadero de TIERRACOLINA ubicado en la ${direccionEmpresa} de la ciudad de ${ciudadEmpresa}
+      return `1. El 30 de abril de 2024, el señor ${propietarioPrimerVehiculo} se dispuso a parquear el vehículo de placas ${placasPrimerVehiculo} en el parqueadero de TIERRACOLINA ubicado en la ${direccionEmpresa} de la ciudad de ${ciudadEmpresa}.
 
-2.En la misma fecha, a eso de las ${horaAccidente} aproximadamente, el señor ${propietarioPrimerVehiculo} se entera que su vehículo le habían hurtado los espejos retrovisores en el parqueadero, indicado asi en la denuncia anexada:
+2. En la misma fecha, a eso de las ${horaAccidente} aproximadamente, el señor ${propietarioPrimerVehiculo} se entera que su vehículo le habían hurtado los espejos retrovisores en el parqueadero, indicado así en la denuncia anexada:
 
-3.Como consecuencia de los hechos, el señor ${propietarioPrimerVehiculo}, se dirige al personal de seguridad del parqueadero para reportar lo ocurrido; así mismo, procedió a comunicarse con la policía del cuadrante y presenta la denuncia. Revisadas las cámaras se evidencia ingreso al edificio de sujeto desconocido en “modalidad de trencito” el cual baja al sótano y roba los espejos del vehículo ${placasPrimerVehiculo}.
+3. Como consecuencia de los hechos, el señor ${propietarioPrimerVehiculo}, se dirige al personal de seguridad del parqueadero para reportar lo ocurrido; así mismo, procedió a comunicarse con la policía del cuadrante y presenta la denuncia. Revisadas las cámaras se evidencia ingreso al edificio de sujeto desconocido en “modalidad de trencito” el cual baja al sótano y roba los espejos del vehículo ${placasPrimerVehiculo}.
 
-4.El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del hurto por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
+4. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del hurto por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
 
-5.De conformidad con el aviso de reclamo y la documentación que soporta el siniestro, la compañía de Seguros Generales Sura S.A., se afectó el amparo por hurto parcial y se procedió a indemnizar al señor ${propietarioPrimerVehiculo} por el valor de $ ${cuantia}
+5. De conformidad con el aviso de reclamo y la documentación que soporta el siniestro, la compañía de Seguros Generales Sura S.A., se afectó el amparo por hurto parcial y se procedió a indemnizar al señor ${propietarioPrimerVehiculo} por el valor de $ ${cuantia}
 
-6.Asimismo, el señor ${propietarioPrimerVehiculo} canceló la suma de $ ${deducible} pesos por concepto del deducible por el amparo afectado.`;
+6. Asimismo, el señor ${propietarioPrimerVehiculo} canceló la suma de $ ${deducible} pesos por concepto del deducible por el amparo afectado.`;
 
     default:
       return getDefaultHechosContent(formData, 'RCE DAÑOS');
@@ -502,18 +729,21 @@ const getTemplatePath = (caseType: string): string => {
   }
 };
 
+// Función principal del servidor ACTUALIZADA
 export const generateDocumentBlobServer = async (
   formData: any, 
   caseType: string, 
   tabContents?: any,
+  hechosEstructurados?: Hecho[],
   imageFiles?: any[]
 ): Promise<Blob> => {
   try {
-    console.log('=== INICIO GENERACIÓN DE DOCUMENTO EN SERVIDOR ===')
+    console.log('=== INICIO GENERACIÓN DE DOCUMENTO CON HECHOS COMO LOOP ===')
     console.log('Tipo de caso:', caseType)
     console.log('Datos recibidos:', Object.keys(formData))
     console.log('Contenido de tabs recibido:', tabContents ? Object.keys(tabContents) : 'No incluido')
-    console.log('Imágenes recibidas:', imageFiles ? imageFiles.length : 0)
+    console.log('Hechos estructurados recibidos:', hechosEstructurados ? hechosEstructurados.length : 0)
+    console.log('Imágenes adicionales recibidas:', imageFiles ? imageFiles.length : 0)
     
     // Determinar qué plantilla usar basado en el tipo de caso
     const templatePath = getTemplatePath(caseType);
@@ -537,7 +767,7 @@ export const generateDocumentBlobServer = async (
         console.log('getImage llamado con tag:', typeof tag, tag ? tag.substring(0, 50) + '...' : 'undefined');
         
         if (typeof tag === 'string' && tag.startsWith('data:image')) {
-          console.log('Procesando data URL desde propiedad src');
+          console.log('Procesando data URL desde propiedad');
           const result = base64DataURLToArrayBuffer(tag);
           console.log('Resultado de conversión:', result ? 'ArrayBuffer generado' : 'Falló la conversión');
           return result;
@@ -549,6 +779,13 @@ export const generateDocumentBlobServer = async (
       getSize(img: any, tagValue: any, tagName: string) {
         console.log('getSize llamado para tagName:', tagName, 'tagValue type:', typeof tagValue);
         
+        // Para imágenes de hechos dentro del loop
+        if (typeof tagValue === 'string' && tagValue.startsWith('data:image')) {
+          console.log('Usando dimensiones por defecto para imagen de hecho: 400x300');
+          return [400, 300];
+        }
+        
+        // Para otras imágenes con dimensiones especificadas
         if (tagValue && typeof tagValue === 'object' && tagValue.width && tagValue.height) {
           console.log('Usando dimensiones del objeto imagen:', tagValue.width, 'x', tagValue.height);
           return [tagValue.width, tagValue.height];
@@ -564,59 +801,65 @@ export const generateDocumentBlobServer = async (
     // Crear el documento con docxtemplater CON módulo de imágenes
     let doc
     try {
-      console.log('Creando Docxtemplater con módulo de imágenes...')
+      console.log('Creando Docxtemplater con módulo de imágenes y soporte para loops...')
       doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
         modules: [imageModule]
       })
-      console.log('Docxtemplater creado exitosamente con soporte para imágenes')
+      console.log('Docxtemplater creado exitosamente con soporte para imágenes y loops')
     } catch (error) {
       console.error('Error al crear Docxtemplater:', error)
       throw error
     }
 
-    // Preparar los datos para la plantilla incluyendo contenido de tabs e imágenes
-    console.log('Preparando datos para plantilla con imágenes...')
-    const templateData = await prepareTemplateData(formData, caseType, tabContents, imageFiles)
+    // Preparar los datos para la plantilla con hechos estructurados como loop
+    console.log('Preparando datos para plantilla con hechos como loop estructurado...')
+    const templateData = await prepareTemplateData(
+      formData, 
+      caseType, 
+      tabContents, 
+      hechosEstructurados, 
+      imageFiles
+    )
     console.log('Datos preparados:', Object.keys(templateData))
-    console.log('Imágenes en templateData:', templateData.imagenesHechos ? templateData.imagenesHechos.length : 0)
+    console.log('Hechos para loop en templateData:', templateData.hechos ? templateData.hechos.length : 0)
+    console.log('Imágenes adicionales en templateData:', templateData.imagenesAdicionales ? templateData.imagenesAdicionales.length : 0)
     
-    // Logging adicional para debugging
-    console.log('Template data final que se enviará a docxtemplater:')
-    Object.keys(templateData).forEach(key => {
-      if (key === 'imagenesHechos') {
-        console.log(`  ${key}:`, Array.isArray(templateData[key]) ? `Array con ${templateData[key].length} elementos` : 'No es array')
-        if (Array.isArray(templateData[key]) && templateData[key].length > 0) {
-          templateData[key].forEach((img, idx) => {
-            console.log(`    Imagen ${idx}:`, {
-              hasSrc: !!img.src,
-              width: img.width,
-              height: img.height,
-              srcPreview: img.src ? img.src.substring(0, 50) + '...' : 'No src'
-            })
-          })
-        }
-      } else {
-        console.log(`  ${key}:`, typeof templateData[key] === 'string' ? templateData[key].substring(0, 50) + '...' : templateData[key])
-      }
-    })
+    // Logging detallado para debugging del loop de hechos
+    console.log('=== ESTRUCTURA DE HECHOS PARA DOCXTEMPLATER LOOP ===')
+    if (templateData.hechos && Array.isArray(templateData.hechos)) {
+      templateData.hechos.forEach((hecho, idx) => {
+        console.log(`Hecho ${idx + 1}:`, {
+          descripcion: hecho.descripcionHecho ? hecho.descripcionHecho.substring(0, 100) + '...' : 'Sin descripción',
+          tieneFoto: !!hecho.fotoHecho,
+          tipoFoto: hecho.fotoHecho ? (typeof hecho.fotoHecho === 'string' ? 'Data URL' : typeof hecho.fotoHecho) : 'No tiene foto'
+        })
+      })
+    } else {
+      console.log('ERROR: templateData.hechos no es un array válido!')
+    }
+    console.log('================================================')
     
     // Renderizar el documento
     try {
-      console.log('Renderizando documento con múltiples imágenes...')
-      console.log('imagenesHechos es array:', Array.isArray(templateData.imagenesHechos))
-      console.log('imagenesHechos length:', templateData.imagenesHechos ? templateData.imagenesHechos.length : 'undefined')
+      console.log('Renderizando documento con loop de hechos...')
+      console.log('Estructura de datos para docxtemplater:')
+      console.log('- hechos es array:', Array.isArray(templateData.hechos))
+      console.log('- hechos length:', templateData.hechos ? templateData.hechos.length : 'undefined')
+      console.log('- hechos con fotos:', templateData.hechos ? templateData.hechos.filter(h => h.fotoHecho).length : 0)
+      
       doc.render(templateData)
-      console.log('Documento renderizado exitosamente')
+      console.log('Documento renderizado exitosamente con loop de hechos')
     } catch (renderError) {
       console.error('Error crítico al renderizar documento:', renderError)
       console.error('Detalles del error:', {
         message: renderError.message,
         stack: renderError.stack,
         templateDataKeys: Object.keys(templateData),
-        imagenesHechosType: typeof templateData.imagenesHechos,
-        imagenesHechosLength: Array.isArray(templateData.imagenesHechos) ? templateData.imagenesHechos.length : 'No es array'
+        hechosType: typeof templateData.hechos,
+        hechosLength: Array.isArray(templateData.hechos) ? templateData.hechos.length : 'No es array',
+        primerHecho: templateData.hechos && templateData.hechos.length > 0 ? templateData.hechos[0] : 'No hay hechos'
       })
       throw new Error(`Error al renderizar documento: ${renderError instanceof Error ? renderError.message : 'Error desconocido'}`)
     }
@@ -657,9 +900,11 @@ export const generateDocumentBlobServer = async (
         type: 'application/pdf'
       })
       
-      console.log('=== DOCUMENTO PDF CON IMÁGENES GENERADO EXITOSAMENTE ===')
+      console.log('=== DOCUMENTO PDF CON LOOP DE HECHOS GENERADO EXITOSAMENTE ===')
       console.log('Tamaño del blob PDF:', blob.size, 'bytes')
       console.log('Tipo de caso procesado:', caseType)
+      console.log('Hechos procesados en loop:', templateData.hechos ? templateData.hechos.length : 0)
+      console.log('Hechos con imágenes:', templateData.hechos ? templateData.hechos.filter(h => h.fotoHecho).length : 0)
       
       return blob
       
@@ -671,15 +916,17 @@ export const generateDocumentBlobServer = async (
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       })
       
-      console.log('=== DOCUMENTO DOCX CON IMÁGENES GENERADO COMO FALLBACK ===')
+      console.log('=== DOCUMENTO DOCX CON LOOP DE HECHOS GENERADO COMO FALLBACK ===')
       console.log('Tamaño del blob DOCX:', blob.size, 'bytes')
       console.log('Tipo de caso procesado:', caseType)
+      console.log('Hechos procesados en loop:', templateData.hechos ? templateData.hechos.length : 0)
+      console.log('Hechos con imágenes:', templateData.hechos ? templateData.hechos.filter(h => h.fotoHecho).length : 0)
       
       return blob
     }
     
   } catch (error) {
-    console.error('=== ERROR AL GENERAR DOCUMENTO EN SERVIDOR ===')
+    console.error('=== ERROR AL GENERAR DOCUMENTO CON LOOP DE HECHOS ===')
     console.error('Error:', error)
     console.error('Tipo de caso que falló:', caseType)
     throw error
@@ -688,3 +935,27 @@ export const generateDocumentBlobServer = async (
 
 // Función de compatibilidad con el nombre esperado por el route.ts
 export const generateDocumentBlob = generateDocumentBlobServer
+
+// Función auxiliar para validar estructura de hechos
+export const validateHechosStructure = (hechos: any[]): boolean => {
+  if (!Array.isArray(hechos)) {
+    console.error('validateHechosStructure: hechos no es un array')
+    return false;
+  }
+  
+  const isValid = hechos.every((hecho, index) => {
+    const hasValidId = typeof hecho.id === 'string' && hecho.id.trim().length > 0;
+    const hasValidDescription = typeof hecho.descripcionHecho === 'string' && hecho.descripcionHecho.trim().length > 0;
+    const hasValidPhoto = hecho.fotoHecho === null || hecho.fotoHecho === undefined || 
+      (typeof hecho.fotoHecho === 'object' && typeof hecho.fotoHecho.data === 'string');
+    
+    if (!hasValidId) console.error(`Hecho ${index}: ID inválido`);
+    if (!hasValidDescription) console.error(`Hecho ${index}: Descripción inválida`);
+    if (!hasValidPhoto) console.error(`Hecho ${index}: Foto inválida`);
+    
+    return hasValidId && hasValidDescription && hasValidPhoto;
+  });
+  
+  console.log('validateHechosStructure:', isValid ? 'VÁLIDO' : 'INVÁLIDO');
+  return isValid;
+}

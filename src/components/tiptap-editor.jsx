@@ -11,18 +11,36 @@ const formatCurrency = (value) => {
 
 import React, { useState, useEffect } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Plus, Trash2, Upload } from 'lucide-react'
 
-const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabContentChange, onImagesChange }) => {
+const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabContentChange, onImagesChange, onHechosChange }) => {
   const [activeTab, setActiveTab] = useState("informacion-empresa");
   const [forceRegenerate, setForceRegenerate] = useState(0);
   const [images, setImages] = useState([]);
+  const [hechos, setHechos] = useState([]);
+
+  // Inicializar hechos cuando cambie el tipo de caso o los datos del formulario
+  useEffect(() => {
+    if (caseType && formData) {
+      const hechosDefault = generateDefaultHechos(formData, caseType);
+      setHechos(hechosDefault);
+      // Notificar al componente padre
+      if (onHechosChange) {
+        onHechosChange(hechosDefault);
+      }
+    }
+  }, [caseType, formData]);
 
   const handleRegenerateContent = () => {
     if (onTabContentChange) {
       onTabContentChange('fundamentos', generateFundamentosContent(formData, caseType));
       onTabContentChange('anexos', getDefaultAnexosContent(formData, caseType));
-      onTabContentChange('hechos', generateHechosContent(formData, caseType));
+    }
+    // Regenerar hechos
+    const hechosDefault = generateDefaultHechos(formData, caseType);
+    setHechos(hechosDefault);
+    if (onHechosChange) {
+      onHechosChange(hechosDefault);
     }
   };
 
@@ -32,7 +50,101 @@ const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabCon
     }
   };
 
-  // Función para manejar la subida de imágenes
+  // Función para generar hechos por defecto basado en el tipo de caso - CORREGIDA
+  const generateDefaultHechos = (formData, caseType) => {
+    const hechosTexto = generateHechosContent(formData, caseType);    
+    const hechosArray = hechosTexto
+      .split(/(?:^|\n)\s*(\d+)\.\s+(?!\d)/)
+      .filter(h => h && h.trim().length > 0 && !/^\d+$/.test(h.trim()));
+    
+    return hechosArray.map((hecho, index) => ({
+      id: `hecho_${Date.now()}_${index}`,
+      descripcionHecho: (index + 1) + ". " + hecho.trim(),
+      fotoHecho: null
+    }));
+  };
+
+  // Función para agregar un nuevo hecho
+  const handleAgregarHecho = () => {
+    const nuevoHecho = {
+      id: `hecho_${Date.now()}`,
+      descripcionHecho: '',
+      fotoHecho: null
+    };
+    const nuevosHechos = [...hechos, nuevoHecho];
+    setHechos(nuevosHechos);
+    if (onHechosChange) {
+      onHechosChange(nuevosHechos);
+    }
+  };
+
+  // Función para eliminar un hecho
+  const handleEliminarHecho = (hechoId) => {
+    const nuevosHechos = hechos.filter(h => h.id !== hechoId);
+    setHechos(nuevosHechos);
+    if (onHechosChange) {
+      onHechosChange(nuevosHechos);
+    }
+  };
+
+  // Función para actualizar la descripción de un hecho
+  const handleActualizarDescripcionHecho = (hechoId, nuevaDescripcion) => {
+    const nuevosHechos = hechos.map(h => 
+      h.id === hechoId 
+        ? { ...h, descripcionHecho: nuevaDescripcion }
+        : h
+    );
+    setHechos(nuevosHechos);
+    if (onHechosChange) {
+      onHechosChange(nuevosHechos);
+    }
+  };
+
+  // Función para subir imagen a un hecho específico
+  const handleImagenHecho = (hechoId, event) => {
+    const file = event.target.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const imageData = {
+          id: Date.now().toString(),
+          name: file.name,
+          data: e.target?.result,
+          file: file,
+          width: 400, // Ancho por defecto
+          height: 300 // Alto por defecto
+        };
+
+        const nuevosHechos = hechos.map(h => 
+          h.id === hechoId 
+            ? { ...h, fotoHecho: imageData }
+            : h
+        );
+        setHechos(nuevosHechos);
+        if (onHechosChange) {
+          onHechosChange(nuevosHechos);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+    // Limpiar el input
+    event.target.value = '';
+  };
+
+  // Función para eliminar imagen de un hecho
+  const handleEliminarImagenHecho = (hechoId) => {
+    const nuevosHechos = hechos.map(h => 
+      h.id === hechoId 
+        ? { ...h, fotoHecho: null }
+        : h
+    );
+    setHechos(nuevosHechos);
+    if (onHechosChange) {
+      onHechosChange(nuevosHechos);
+    }
+  };
+
+  // Función para manejar la subida de imágenes (para otras tabs)
   const handleImageUpload = (event) => {
     const files = Array.from(event.target.files);
 
@@ -41,56 +153,33 @@ const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabCon
         const reader = new FileReader();
         reader.onload = (e) => {
           const imageData = {
-            id: Date.now() + Math.random(), // ID único
+            id: Date.now() + Math.random(),
             name: file.name,
-            data: e.target.result, // Base64 data URL (data:image/...;base64,...)
-            file: file, // Archivo original para docxtemplater
-            width: 100, // Ancho por defecto
-            height: 300 // Alto por defecto
+            data: e.target.result,
+            file: file,
+            width: 100,
+            height: 300
           };
-
-          console.log('Nueva imagen agregada:', {
-            name: imageData.name,
-            dataLength: imageData.data.length,
-            dataPreview: imageData.data.substring(0, 50) + '...'
-          });
 
           setImages(prev => {
             const newImages = [...prev, imageData];
-            // Notificar al componente padre sobre los cambios
             if (onImagesChange) {
               onImagesChange(newImages);
             }
             return newImages;
           });
         };
-        reader.readAsDataURL(file); // Esto genera data:image/...;base64,...
+        reader.readAsDataURL(file);
       }
     });
 
-    // Limpiar el input
     event.target.value = '';
   };
 
-  // Función para eliminar una imagen
+  // Función para eliminar una imagen (para otras tabs)
   const handleRemoveImage = (imageId) => {
     setImages(prev => {
       const newImages = prev.filter(img => img.id !== imageId);
-      if (onImagesChange) {
-        onImagesChange(newImages);
-      }
-      return newImages;
-    });
-  };
-
-  // Función para actualizar dimensiones de imagen
-  const handleImageDimensionChange = (imageId, dimension, value) => {
-    setImages(prev => {
-      const newImages = prev.map(img =>
-        img.id === imageId
-          ? { ...img, [dimension]: parseInt(value) || 0 }
-          : img
-      );
       if (onImagesChange) {
         onImagesChange(newImages);
       }
@@ -102,7 +191,7 @@ const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabCon
     { id: "informacion-empresa", label: "Información Empresa", readOnly: true },
     { id: "asunto", label: "Asunto", readOnly: true },
     { id: "solicitud", label: "Solicitud", readOnly: true },
-    { id: "hechos", label: "Hechos", readOnly: false }, // NUEVA SECCIÓN EDITABLE
+    { id: "hechos", label: "Hechos", readOnly: false, special: 'hechos' },
     { id: "fundamentos", label: "Fundamentos de Derecho", readOnly: true },
     { id: "notificaciones", label: "Notificaciones", readOnly: true },
     { id: "anexos", label: "Anexos", readOnly: false },
@@ -117,7 +206,7 @@ const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabCon
       case "solicitud":
         return generateSolicitudContent(formData, caseType);
       case "hechos":
-        return tabContents.hechos || generateHechosContent(formData, caseType);
+        return ""; // Los hechos se manejan de manera especial
       case "fundamentos":
         return generateFundamentosContent(formData, caseType);
       case "notificaciones":
@@ -150,7 +239,117 @@ const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabCon
         {tabs.map((tab) => (
           <TabsContent key={tab.id} value={tab.id} className="flex-1 overflow-hidden">
             <div className="h-full flex flex-col">
-              {tab.readOnly ? (
+              {tab.special === 'hechos' ? (
+                // Editor especial para hechos
+                <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden flex-1 flex flex-col">
+                  {/* Toolbar para hechos */}
+                  <div className="bg-white border-b border-gray-200 p-3 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleRegenerateContent}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-md transition-all duration-200 border border-gray-200 hover:bg-gray-100 text-gray-600 hover:border-gray-300"
+                        title="Regenerar contenido desde formulario"
+                      >
+                        <RefreshCw size={14} />
+                      </button>
+                      <button
+                        onClick={handleAgregarHecho}
+                        className="inline-flex items-center gap-2 px-3 py-1 text-xs font-medium rounded-md border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 cursor-pointer transition-colors"
+                      >
+                        <Plus size={12} />
+                        Agregar Hecho
+                      </button>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {hechos.length} hecho(s)
+                    </div>
+                  </div>
+
+                  {/* Lista de hechos */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {hechos.map((hecho, index) => (
+                      <div key={hecho.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                        {/* Header del hecho */}
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-medium text-gray-900">
+                            Hecho {index + 1}
+                          </h4>
+                          <div className="flex items-center gap-2">
+                            {/* Input file oculto para subir imagen */}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleImagenHecho(hecho.id, e)}
+                              className="hidden"
+                              id={`image-upload-${hecho.id}`}
+                            />
+                            <label
+                              htmlFor={`image-upload-${hecho.id}`}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border border-gray-300 bg-white hover:bg-gray-50 cursor-pointer transition-colors"
+                            >
+                              <Upload size={12} />
+                              Imagen
+                            </label>
+                            <button
+                              onClick={() => handleEliminarHecho(hecho.id)}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 transition-colors"
+                            >
+                              <Trash2 size={12} />
+                              Eliminar
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-4">
+                          {/* Textarea para el hecho */}
+                          <div className="flex-1">
+                            <textarea
+                              value={hecho.descripcionHecho}
+                              onChange={(e) => handleActualizarDescripcionHecho(hecho.id, e.target.value)}
+                              className="w-full p-3 border border-gray-300 rounded-md resize-none text-sm leading-relaxed"
+                              placeholder={`Describa el hecho ${index + 1}...`}
+                              rows={4}
+                              style={{
+                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                              }}
+                            />
+                          </div>
+
+                          {/* Preview de imagen si existe */}
+                          {hecho.fotoHecho && (
+                            <div className="w-48 flex-shrink-0">
+                              <div className="relative">
+                                <img
+                                  src={hecho.fotoHecho.data}
+                                  alt={hecho.fotoHecho.name}
+                                  className="w-full h-32 object-cover rounded border"
+                                />
+                                <button
+                                  onClick={() => handleEliminarImagenHecho(hecho.id)}
+                                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                                  title="Eliminar imagen"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                              <p className="text-xs text-gray-600 mt-1 truncate" title={hecho.fotoHecho.name}>
+                                {hecho.fotoHecho.name}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                    {hechos.length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <p>No hay hechos definidos.</p>
+                        <p className="text-xs mt-1">Usa "Regenerar contenido" o "Agregar Hecho" para comenzar.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : tab.readOnly ? (
                 // Vista de solo lectura
                 <div className="bg-gray-50 border border-gray-200 rounded-lg shadow-sm overflow-y-auto flex-1 p-6">
                   <div className="max-w-none prose prose-sm">
@@ -160,7 +359,7 @@ const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabCon
                   </div>
                 </div>
               ) : (
-                // Editor editable con textarea
+                // Editor editable con textarea (para otras tabs como anexos)
                 <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden flex-1 flex flex-col">
                   {/* Toolbar */}
                   <div className="bg-white border-b border-gray-200 p-3 flex justify-between items-center">
@@ -172,8 +371,8 @@ const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabCon
                       <RefreshCw size={14} />
                     </button>
 
-                    {/* Botón para subir imágenes solo en la tab de Hechos */}
-                    {tab.id === 'hechos' && (
+                    {/* Botón para subir imágenes solo en otras tabs que no sean hechos
+                    {tab.id !== 'hechos' && (
                       <div className="flex items-center gap-2">
                         <input
                           type="file"
@@ -190,7 +389,7 @@ const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabCon
                           📷 Subir Imágenes
                         </label>
                       </div>
-                    )}
+                    )} */}
                   </div>
 
                   {/* Contenedor principal con textarea y panel de imágenes */}
@@ -207,14 +406,13 @@ const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabCon
                       }}
                     />
 
-                    {/* Panel de imágenes solo para la tab de Hechos */}
-                    {tab.id === 'hechos' && images.length > 0 && (
+                    {/* Panel de imágenes para otras tabs */}
+                    {tab.id !== 'hechos' && images.length > 0 && (
                       <div className="w-80 border-l border-gray-200 bg-gray-50 p-4 overflow-y-auto">
                         <h3 className="text-sm font-medium text-gray-900 mb-3">Imágenes ({images.length})</h3>
                         <div className="space-y-4">
                           {images.map((image) => (
                             <div key={image.id} className="bg-white rounded-lg border border-gray-200 p-3">
-                              {/* Preview de la imagen */}
                               <div className="mb-2">
                                 <img
                                   src={image.data}
@@ -222,13 +420,9 @@ const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabCon
                                   className="w-full h-32 object-cover rounded border"
                                 />
                               </div>
-
-                              {/* Nombre del archivo */}
                               <p className="text-xs text-gray-600 mb-2 truncate" title={image.name}>
                                 {image.name}
                               </p>
-
-                              {/* Botón para eliminar */}
                               <button
                                 onClick={() => handleRemoveImage(image.id)}
                                 className="w-full px-2 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors"
@@ -251,13 +445,15 @@ const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabCon
   )
 }
 
+// Resto de funciones auxiliares permanecen igual...
+// (generateInformacionEmpresa, generateAsuntoContent, etc.)
+
 // Función para generar contenido de la tab "Información Empresa" (solo vista)
 const generateInformacionEmpresa = (formData = {}) => {
   const formatValue = (value, defaultText = '') => {
     return value && value.toString().trim() ? value.toString().trim() : defaultText;
   };
 
-  // Obtener fecha actual formateada
   const fechaActual = new Date();
   const monthNames = [
     'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
@@ -268,7 +464,6 @@ const generateInformacionEmpresa = (formData = {}) => {
   const mesActual = monthNames[fechaActual.getMonth()];
   const añoActual = fechaActual.getFullYear();
 
-  // Datos de la empresa
   const nombreEmpresa = formatValue(formData.nombreEmpresa, '{nombreEmpresa}');
   const nitEmpresa = formatValue(formData.nitEmpresa, '{nitEmpresa}');
   const direccionEmpresa = formatValue(formData.direccionEmpresa, '{direccionEmpresa}');
@@ -315,7 +510,7 @@ const generateSolicitudContent = (formData = {}, caseType = "") => {
   const propietarioPrimerVehiculo = formData?.propietarioPrimerVehiculo || '{propietarioPrimerVehiculo}';
   const propietarioSegundoVehiculo = formData?.propietarioSegundoVehiculo || '{propietarioSegundoVehiculo}';
   const cuantia = formatCurrency(formData?.cuantia);
-  const deducible = formatCurrency(formData.deducible); // Valor fijo de deducible por ahora
+  const deducible = formatCurrency(formData.deducible);
   const nombreAseguradora = formData.nombreAseguradora || '{nombreAseguradora}';
 
   switch (caseType) {
@@ -340,7 +535,7 @@ const generateSolicitudContent = (formData = {}, caseType = "") => {
   }
 };
 
-// Función para generar contenido de HECHOS según el tipo de caso
+// Función para generar contenido de HECHOS según el tipo de caso (para generar hechos por defecto)
 const generateHechosContent = (formData = {}, caseType = "") => {
   const diaAccidente = formData.diaAccidente || '{diaAccidente}';
   const mesAccidente = formData.mesAccidente || '{mesAccidente}';
@@ -388,7 +583,7 @@ const generateHechosContent = (formData = {}, caseType = "") => {
 4. Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia} por concepto de reparación de los daños materiales sufridos al vehículo de placas ${placasPrimerVehiculo}.`;
 
     case 'RCE SOLO DEDUCIBLE':
-      return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en la ${direccionAccidente} ${ciudad}, ${departamento} se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} de propiedad de ${propietarioPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} afiliado a la empresa de transportes ${afiliador} conducido por ${conductorVehiculoInfractor}
+      return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en la ${direccionAccidente} ${ciudad}, ${departamento} se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} de propiedad de ${propietarioPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} afiliado a la empresa de transportes ${afiliador} conducido por ${conductorVehiculoInfractor}.
 
 2. Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.
 
@@ -399,37 +594,37 @@ const generateHechosContent = (formData = {}, caseType = "") => {
 5. Para que el vehículo de placas ${placasPrimerVehiculo} fuese reparado, ${propietarioPrimerVehiculo} locatario y tenedor material del vehículo debió asumir el valor de un deducible por la suma de $ ${cuantia} (de lo cual quedó constancia en la factura anexada al presente documento.`;
 
     case 'RCE DAÑOS + OBJECION':
-      return `1.El ${diaAccidente} de ${mesAccidente} del ${añoAccidente}  en ${direccionAccidente} de la ciudad de ${ciudad}.; se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${afiliador}
+      return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente}  en ${direccionAccidente} de la ciudad de ${ciudad}.; se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${afiliador}.
 
-2.Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo} 
+2. Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.
 
-3.El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
+3. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
 
-4.Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia}  por concepto de daños sufridos al vehículo de placas ${placasPrimerVehiculo}.
+4. Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia} por concepto de daños sufridos al vehículo de placas ${placasPrimerVehiculo}.
 
 5. En consecuencia, se presentó reclamación de responsabilidad civil ante la aseguradora MUNDIAL frente al siniestro en mención, no obstante, objetan la reclamación, dejando sin cobertura al vehículo del tercero responsable.`;
 
     case 'RCE DAÑOS + DEDUCIBLE':
-      return `1.El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en ${direccionAccidente}, ${departamento}, se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${propietarioSegundoVehiculo}  afiliado a la empresa de transporte ${afiliador}
+      return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en ${direccionAccidente}, ${departamento}, se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${propietarioSegundoVehiculo}  afiliado a la empresa de transporte ${afiliador}.
 
-2.Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}
+2. Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.
 
-3.El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura}; expedida por Seguros Generales Suramericana.
+3. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura}; expedida por Seguros Generales Suramericana.
 
-4.Para que el vehículo de placas ${placasPrimerVehiculo} fuese reparado, ${propietarioPrimerVehiculo} debió asumir el valor de un deducible por la suma de $ ${deducible} de lo cual quedó constancia en la factura anexada al presente documento.
+4. Para que el vehículo de placas ${placasPrimerVehiculo} fuese reparado, ${propietarioPrimerVehiculo} debió asumir el valor de un deducible por la suma de $ ${deducible} de lo cual quedó constancia en la factura anexada al presente documento.
 
-5.Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia} por concepto de pérdida total sufridos al vehículo de placas ${placasPrimerVehiculo} .`
+5. Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia} por concepto de pérdida total sufridos al vehículo de placas ${placasPrimerVehiculo}.`
 
     case 'RCE DAÑOS + DEDUCIBLE + OBJECION':
-      return `1.El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en ${direccionAccidente} en el sector del peaje ${ciudad}, se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${propietarioSegundoVehiculo} afiliado a la empresa de transporte ${afiliador}
+      return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en ${direccionAccidente} en el sector del peaje ${ciudad}, se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} de propiedad de ${propietarioSegundoVehiculo} afiliado a la empresa de transporte ${afiliador}.
 
-2.Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}
+2. Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.
 
-3.El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
+3. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
 
-4.Para que el vehículo de placas ${placasPrimerVehiculo} fuese reparado, ${propietarioPrimerVehiculo} debió asumir el valor de un deducible por la suma de $ ${deducible} de lo cual quedó constancia en la factura anexada al presente documento.
+4. Para que el vehículo de placas ${placasPrimerVehiculo} fuese reparado, ${propietarioPrimerVehiculo} debió asumir el valor de un deducible por la suma de $ ${deducible} de lo cual quedó constancia en la factura anexada al presente documento.
 
-5.Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ {cuantia} por concepto de pérdida total sufridos al vehículo de placas ${placasPrimerVehiculo}.
+5. Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma de $ ${cuantia} por concepto de pérdida total sufridos al vehículo de placas ${placasPrimerVehiculo}.
 
 6. En consecuencia, se presentó reclamación de responsabilidad civil ante la aseguradora SEGUROS DEL ESTADO frente al siniestro en mención, no obstante, objetan manifestando:
 
@@ -437,58 +632,57 @@ const generateHechosContent = (formData = {}, caseType = "") => {
 `;
 
     case 'RCE SOLO DEDUCIBLE + OBJECION':
-      return `1.El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en ${direccionEmpresa} ${ciudad}, ${departamento}  se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} de propiedad de ${propietarioPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} afiliado a la empresa de transportes ${afiliador} conducido por ${conductorVehiculoInfractor}
+      return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente} en ${direccionEmpresa} ${ciudad}, ${departamento}  se presentó un accidente de tránsito entre el vehículo de placas ${placasPrimerVehiculo} de propiedad de ${propietarioPrimerVehiculo} y el vehículo de placas ${placasSegundoVehiculo} afiliado a la empresa de transportes ${afiliador} conducido por ${conductorVehiculoInfractor}.
 
-2.Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.
+2. Derivado del mentado accidente se levantó la evidencia fotográfica conforme a lo previsto en el artículo 16 de la Ley 2251 del 2022, donde se atribuye la responsabilidad al conductor del vehículo de placas ${placasSegundoVehiculo}.
 
-3.El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
+3. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del accidente por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
 
-4.Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma por concepto de reparación de los daños materiales sufridos por el vehículo de placas ${placasPrimerVehiculo}.
+4. Producto del accidente de tránsito Seguros Generales Sura S.A. canceló la suma por concepto de reparación de los daños materiales sufridos por el vehículo de placas ${placasPrimerVehiculo}.
 
-5.Para que el vehículo de placas ${placasPrimerVehiculo} fuese reparado, ${empresaTenedora} locatario y tenedor material del vehículo debió asumir el valor de un deducible por la suma de $ ${deducible} de lo cual quedó constancia en la factura anexada al presente documento.
+5. Para que el vehículo de placas ${placasPrimerVehiculo} fuese reparado, ${empresaTenedora} locatario y tenedor material del vehículo debió asumir el valor de un deducible por la suma de $ ${deducible} de lo cual quedó constancia en la factura anexada al presente documento.
 
-6.En concordancia con el pago de la aseguradora {nombreAseguradora}, se realizó reclamo por concepto de deducible, no obstante, fue objetado por:
+6. En concordancia con el pago de la aseguradora ${nombreAseguradora}, se realizó reclamo por concepto de deducible, no obstante, fue objetado por:
 
   “Como quiera, que el monto del deducible ($ ${deducible}) supera la cuantía solicitada ($ ${cuantia}), lamentamos informarle que no hay lugar a indemnización alguna bajo la presente póliza. Con fundamento en lo anterior, nos permitimos informar que no es posible atender favorablemente su solicitud, y por lo tanto, {nombreAseguradora} OBJETA formal e íntegramente su reclamación. “
 
 Es decir que, como el contrato de póliza de ${nombreEmpresa} incluye un deducible del mismo valor por el cual se pretende, en esos casos lo deberá asumir directamente su asegurado.`;
 
     case 'RCE HURTO':
-      return `1.El ${diaAccidente} de ${mesAccidente} del ${añoAccidente}, el señor ${propietarioPrimerVehiculo} se dispuso a parquear el vehículo de placas ${placasPrimerVehiculo} en ${nombreEmpresa} ubicado en ${direccionEmpresa} de la ciudad de ${ciudad}
+      return `1. El ${diaAccidente} de ${mesAccidente} del ${añoAccidente}, el señor ${propietarioPrimerVehiculo} se dispuso a parquear el vehículo de placas ${placasPrimerVehiculo} en ${nombreEmpresa} ubicado en ${direccionEmpresa} de la ciudad de ${ciudad}.
 
-2.El ${diaAccidente}/${mesAccidente}/${añoAccidente}, el señor ${propietarioPrimerVehiculo} se entera que su vehículo había sido hurtado, siendo parte de los hechos de la denuncia anexada al presente escrito:
+2. El ${diaAccidente}/${mesAccidente}/${añoAccidente}, el señor ${propietarioPrimerVehiculo} se entera que su vehículo había sido hurtado, siendo parte de los hechos de la denuncia anexada al presente escrito.
 
-3.De acuerdo a los registros videográficos, el vehículo fue hurtado de las instalaciones del parqueadero en horas de la madrugada.
+3. De acuerdo a los registros videográficos, el vehículo fue hurtado de las instalaciones del parqueadero en horas de la madrugada.
 
-4.El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del hurto por la póliza de seguros expedida por Seguros Generales Suramericana.
+4. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del hurto por la póliza de seguros expedida por Seguros Generales Suramericana.
 
-5.De conformidad con el aviso de reclamo y la documentación que soporta el siniestro, la compañía de Seguros Generales Sura S.A., afectó el amparo por hurto y se procedió a indemnizar a ${propietarioPrimerVehiculo} por el valor de $ ${cuantia}
+5. De conformidad con el aviso de reclamo y la documentación que soporta el siniestro, la compañía de Seguros Generales Sura S.A., afectó el amparo por hurto y se procedió a indemnizar a ${propietarioPrimerVehiculo} por el valor de $ ${cuantia}.
 
-6.Asimismo, ${propietarioPrimerVehiculo} canceló la suma de $ ${deducible} pesos por concepto del deducible por el amparo afectado.
+6. Asimismo, ${propietarioPrimerVehiculo} canceló la suma de $ ${deducible} pesos por concepto del deducible por el amparo afectado.
 
-7. En consecuencia, se presentó reclamación de responsabilidad civil ante la aseguradora ${nombreAseguradora} frente al siniestro en mención, no obstante, objetan, manifestando que:
-
-Es decir que, la póliza contratada excluye dentro de su protección eventos como el hurto, estando éste fuera de su cobertura.`;
+7. En consecuencia, se presentó reclamación de responsabilidad civil ante la aseguradora ${nombreAseguradora} frente al siniestro en mención, no obstante, objetan, manifestando que.
+`;
 
     case 'RCE HURTO + DEDUCIBLE':
-      return `1.El 30 de abril de 2024, el señor ${propietarioPrimerVehiculo} se dispuso a parquear el vehículo de placas ${placasPrimerVehiculo} en el parqueadero de TIERRACOLINA ubicado en la ${direccionEmpresa} de la ciudad de ${ciudadEmpresa}
+      return `1. El 30 de abril de 2024, el señor ${propietarioPrimerVehiculo} se dispuso a parquear el vehículo de placas ${placasPrimerVehiculo} en el parqueadero de TIERRACOLINA ubicado en la ${direccionEmpresa} de la ciudad de ${ciudadEmpresa}.
 
-2.En la misma fecha, a eso de las ${horaAccidente} aproximadamente, el señor ${propietarioPrimerVehiculo} se entera que su vehículo le habían hurtado los espejos retrovisores en el parqueadero, indicado asi en la denuncia anexada:
+2. En la misma fecha, a eso de las ${horaAccidente} aproximadamente, el señor ${propietarioPrimerVehiculo} se entera que su vehículo le habían hurtado los espejos retrovisores en el parqueadero, indicado así en la denuncia anexada:
 
-3.Como consecuencia de los hechos, el señor ${propietarioPrimerVehiculo}, se dirige al personal de seguridad del parqueadero para reportar lo ocurrido; así mismo, procedió a comunicarse con la policía del cuadrante y presenta la denuncia. Revisadas las cámaras se evidencia ingreso al edificio de sujeto desconocido en “modalidad de trencito” el cual baja al sótano y roba los espejos del vehículo ${placasPrimerVehiculo}.
+3. Como consecuencia de los hechos, el señor ${propietarioPrimerVehiculo}, se dirige al personal de seguridad del parqueadero para reportar lo ocurrido; así mismo, procedió a comunicarse con la policía del cuadrante y presenta la denuncia. Revisadas las cámaras se evidencia ingreso al edificio de sujeto desconocido en “modalidad de trencito” el cual baja al sótano y roba los espejos del vehículo ${placasPrimerVehiculo}.
 
-4.El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del hurto por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
+4. El vehículo de placas ${placasPrimerVehiculo} se encontraba asegurado al momento del hurto por la póliza de seguros ${numeroPolizaSura} expedida por Seguros Generales Suramericana.
 
-5.De conformidad con el aviso de reclamo y la documentación que soporta el siniestro, la compañía de Seguros Generales Sura S.A., se afectó el amparo por hurto parcial y se procedió a indemnizar al señor ${propietarioPrimerVehiculo} por el valor de $ ${cuantia}
+5. De conformidad con el aviso de reclamo y la documentación que soporta el siniestro, la compañía de Seguros Generales Sura S.A., se afectó el amparo por hurto parcial y se procedió a indemnizar al señor ${propietarioPrimerVehiculo} por el valor de $ ${cuantia}
 
-6.Asimismo, el señor ${propietarioPrimerVehiculo} canceló la suma de $ ${deducible} pesos por concepto del deducible por el amparo afectado.`;
+6. Asimismo, el señor ${propietarioPrimerVehiculo} canceló la suma de $ ${deducible} pesos por concepto del deducible por el amparo afectado.`;
 
     default:
-      return generateHechosContent(formData, 'RCE DAÑOS');
+      return getDefaultHechosContent(formData, 'RCE DAÑOS');
   }
 };
 
-// FUNCIÓN PARA FUNDAMENTOS DE DERECHO (igual para todos los tipos por ahora)
+// Función para generar fundamentos de derecho (permanece igual)
 const generateFundamentosContent = (formData = {}, caseType = "") => {
   const numeroPoliza = formData.numeroPolizaSura || '{numeroPolizaSura}';
   const placasPrimerVehiculo = formData.placasPrimerVehiculo || '{placasPrimerVehiculo}';

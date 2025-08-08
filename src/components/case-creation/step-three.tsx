@@ -8,6 +8,19 @@ import { EmailModal } from "./email-modal"
 import { generateDocument } from "@/lib/document-generator"
 import { getDefaultAnexosContent } from '@/components/tiptap-editor'
 
+interface Hecho {
+  id: string;
+  descripcionHecho: string;
+  fotoHecho?: {
+    id: string;
+    name: string;
+    data: string;
+    file: File;
+    width: number;
+    height: number;
+  } | null;
+}
+
 interface StepThreeProps {
   onPrev: () => void
   onFinish: () => void
@@ -30,18 +43,28 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
   const [isProcessing, setIsProcessing] = useState(false)
   const [isDownloadingWord, setIsDownloadingWord] = useState(false)
   const [currentDocumentImages, setCurrentDocumentImages] = useState<any[]>(documentImages)
+  const [currentHechos, setCurrentHechos] = useState<Hecho[]>([])
+  
   // Estado para los contenidos de los tabs, inicializando anexos con valor por defecto
-  const [tabContents, setTabContents] = useState<{ anexos: string; hechos?: string }>({ anexos: getDefaultAnexosContent(formData) })
+  const [tabContents, setTabContents] = useState<{ anexos: string; hechos?: string }>({ 
+    anexos: getDefaultAnexosContent(formData) 
+  })
 
   // Handler para cambios en los tabs del editor
   const handleTabContentChange = (tabId: string, content: string) => {
     setTabContents(prev => ({ ...prev, [tabId]: content }))
   }
 
-  // Handler para cambios en las imágenes
+  // Handler para cambios en las imágenes (para tabs que no son hechos)
   const handleImagesChange = (images: any[]) => {
     setCurrentDocumentImages(images)
     console.log('Imágenes actualizadas en Step 3:', images.length)
+  }
+
+  // Handler para cambios en los hechos
+  const handleHechosChange = (hechos: Hecho[]) => {
+    setCurrentHechos(hechos)
+    console.log('Hechos actualizados en Step 3:', hechos.length)
   }
 
   const handleDownloadWord = async () => {
@@ -66,16 +89,27 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
       if (tabContents.anexos) {
         formDataForDownload.append('contenidoAnexos', String(tabContents.anexos))
       }
-      // Agregar el contenido de hechos como 'contenidoHechos'
-      if (tabContents.hechos) {
-        formDataForDownload.append('contenidoHechos', String(tabContents.hechos))
+
+      // Agregar los hechos como JSON estructurado
+      if (currentHechos && currentHechos.length > 0) {
+        console.log('Agregando hechos al FormData:', currentHechos.length)
+        formDataForDownload.append('hechos', JSON.stringify(currentHechos))
+        
+        // Agregar las imágenes de los hechos
+        let hechoImageIndex = 0
+        currentHechos.forEach((hecho) => {
+          if (hecho.fotoHecho && hecho.fotoHecho.file) {
+            formDataForDownload.append(`hecho_imagen_${hechoImageIndex}`, hecho.fotoHecho.file, hecho.fotoHecho.name)
+            console.log(`Imagen de hecho agregada: ${hecho.fotoHecho.name}`)
+            hechoImageIndex++
+          }
+        })
       }
 
-      // Agregar las imágenes de la tab Hechos
+      // Agregar las imágenes de otras tabs (si las hay)
       if (currentDocumentImages && currentDocumentImages.length > 0) {
-        console.log('Agregando imágenes al FormData:', currentDocumentImages.length)
+        console.log('Agregando imágenes de otras tabs al FormData:', currentDocumentImages.length)
         
-        // Agregar metadatos de las imágenes
         const imageMetadata = currentDocumentImages.map(img => ({
           id: img.id,
           name: img.name,
@@ -84,7 +118,6 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
         }))
         formDataForDownload.append('imagenesMetadata', JSON.stringify(imageMetadata))
         
-        // Agregar cada archivo de imagen
         currentDocumentImages.forEach((img, index) => {
           if (img.file) {
             formDataForDownload.append(`imagen_${index}`, img.file, img.name)
@@ -163,16 +196,26 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
       if (tabContents.anexos) {
         formDataWithEmail.append('contenidoAnexos', String(tabContents.anexos))
       }
-      // Agregar el contenido de hechos como 'contenidoHechos'
-      if (tabContents.hechos) {
-        formDataWithEmail.append('contenidoHechos', String(tabContents.hechos))
+
+      // Agregar los hechos como JSON estructurado
+      if (currentHechos && currentHechos.length > 0) {
+        console.log('Agregando hechos al email:', currentHechos.length)
+        formDataWithEmail.append('hechos', JSON.stringify(currentHechos))
+        
+        // Agregar las imágenes de los hechos
+        let hechoImageIndex = 0
+        currentHechos.forEach((hecho) => {
+          if (hecho.fotoHecho && hecho.fotoHecho.file) {
+            formDataWithEmail.append(`hecho_imagen_${hechoImageIndex}`, hecho.fotoHecho.file, hecho.fotoHecho.name)
+            hechoImageIndex++
+          }
+        })
       }
 
-      // Agregar las imágenes de la tab Hechos
+      // Agregar las imágenes de otras tabs
       if (currentDocumentImages && currentDocumentImages.length > 0) {
-        console.log('Agregando imágenes al email:', currentDocumentImages.length)
+        console.log('Agregando imágenes de otras tabs al email:', currentDocumentImages.length)
         
-        // Agregar metadatos de las imágenes
         const imageMetadata = currentDocumentImages.map(img => ({
           id: img.id,
           name: img.name,
@@ -181,7 +224,6 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
         }))
         formDataWithEmail.append('imagenesMetadata', JSON.stringify(imageMetadata))
         
-        // Agregar cada archivo de imagen
         currentDocumentImages.forEach((img, index) => {
           if (img.file) {
             formDataWithEmail.append(`imagen_${index}`, img.file, img.name)
@@ -310,8 +352,11 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
           {formData?.anexos && formData.anexos.length > 0 && (
             <p><strong>Anexos:</strong> {formData.anexos.length} archivo(s)</p>
           )}
+          {currentHechos && currentHechos.length > 0 && (
+            <p><strong>Hechos:</strong> {currentHechos.length} hecho(s) con {currentHechos.filter(h => h.fotoHecho).length} imagen(es)</p>
+          )}
           {currentDocumentImages && currentDocumentImages.length > 0 && (
-            <p><strong>Imágenes:</strong> {currentDocumentImages.length} imagen(es) en Hechos</p>
+            <p><strong>Imágenes adicionales:</strong> {currentDocumentImages.length} imagen(es)</p>
           )}
         </div>
       </div>
@@ -324,6 +369,7 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
           tabContents={tabContents}
           onTabContentChange={handleTabContentChange}
           onImagesChange={handleImagesChange}
+          onHechosChange={handleHechosChange}
         />
       </div>
 

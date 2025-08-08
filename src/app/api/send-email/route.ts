@@ -197,7 +197,21 @@ export async function POST(request: NextRequest) {
     // Generar documento Word con imágenes
     let documentBlob: Blob
     try {
-      documentBlob = await generateDocumentBlob(documentData, caseType, undefined, imageFiles)
+      let hechos: any = formData.get('hechos')
+      let hechosArray = undefined
+      if (hechos) {
+        try {
+          hechosArray = JSON.parse(hechos as string)
+        } catch (e) {
+          console.error('Error parseando Hechos:', e)
+          hechosArray = undefined
+        }
+      }
+      hechosArray.forEach((hecho: any) => {
+        // Procesar cada hecho
+        console.log(`Procesando hecho: ${hecho.descripcionHecho} con ID ${hecho.id}`)
+      })
+      documentBlob = await generateDocumentBlob(documentData, caseType, undefined, hechosArray, imageFiles)
       console.log('Documento generado exitosamente con imágenes para email')
     } catch (error) {
       console.error('Error generando documento:', error)
