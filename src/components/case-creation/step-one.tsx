@@ -413,14 +413,14 @@ export function StepOne({
               Anterior
             </Button>
           )}
-          <Button
+          {/* <Button
             onClick={onNext}
             disabled={false} // Remover validación para testing
             className={`${currentStep === 1 ? 'w-full' : 'flex-1'} bg-[#182A76] hover:bg-[#182A76]/90`}
           >
             <SaveIcon className="mr-2 h-4 w-4" />
             Guardar
-          </Button>
+          </Button> */}
         </div>
       </CardContent>
     </Card>
