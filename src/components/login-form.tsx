@@ -11,6 +11,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Image from "next/image"
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { authService } from "@/services/api";
+import { useAuthStore } from "@/store/auth";
+import { useToast } from "@/hooks/use-toast";
 
 export function LoginForm({
   className,
@@ -18,14 +22,47 @@ export function LoginForm({
 }: React.ComponentProps<"div">) {
 
   const router = useRouter();
+  const { setUser, setToken } = useAuthStore();
+  const { showError, showSuccess } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    email: "",
+    password: ""
+  });
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     
-    // Here is where i need to implement the login logic
-    // For now, we will just redirect to the dashboard
+    if (!formData.email || !formData.password) {
+      showError("Por favor ingresa email y contraseña");
+      return;
+    }
 
-    router.push("/dashboard");
+    setIsLoading(true);
+
+    try {
+      const response = await authService.login(formData);
+      
+      // Guardar token y usuario
+      setToken(response.accessToken);
+      setUser(response.user);
+      
+      showSuccess("Inicio de sesión exitoso");
+      router.push("/dashboard");
+    } catch (error) {
+      console.error("Login error:", error);
+      showError(error instanceof Error ? error.message : "Error al iniciar sesión");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -35,15 +72,19 @@ export function LoginForm({
           <Image src={"/btl-logo.svg"} alt="Logo" width={250} height={250} className="mx-auto" />
         </CardHeader>
         <CardContent>
-          <form>
+          <form onSubmit={handleSubmit}>
             <div className="flex flex-col gap-6">
               <div className="grid gap-3">
                 <Label htmlFor="email">Correo electronico</Label>
                 <Input
                   id="email"
+                  name="email"
                   type="email"
                   placeholder="m@example.com"
+                  value={formData.email}
+                  onChange={handleInputChange}
                   required
+                  disabled={isLoading}
                 />
               </div>
               <div className="grid gap-3">
@@ -56,11 +97,19 @@ export function LoginForm({
                     ¿Olvidaste tu contraseña?
                   </a>
                 </div>
-                <Input id="password" type="password" required />
+                <Input 
+                  id="password" 
+                  name="password"
+                  type="password" 
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  required 
+                  disabled={isLoading}
+                />
               </div>
               <div className="flex flex-col gap-3">
-                <Button type="submit" className="w-full" onClick={(e) => handleSubmit(e)}>
-                  Ingresar
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? "Ingresando..." : "Ingresar"}
                 </Button>
               </div>
             </div>

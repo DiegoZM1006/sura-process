@@ -40,8 +40,9 @@ export async function POST(request: NextRequest) {
     const emailSubject = formData.get('emailSubject') as string
     const emailMessage = formData.get('emailMessage') as string
     const caseType = formData.get('caseType') as string
+    const nombreEmpresa = formData.get('nombreEmpresa') as string // 🔥 AGREGADO: Nombre empresa del modal
     
-    console.log('Datos extraídos:', { emailRecipients, emailSubject, caseType })
+    console.log('Datos extraídos:', { emailRecipients, emailSubject, caseType, nombreEmpresa })
     
     // Validaciones básicas
     if (!emailRecipients || !Array.isArray(emailRecipients) || emailRecipients.length === 0) {
@@ -192,19 +193,35 @@ export async function POST(request: NextRequest) {
       }
     })
     
+    // 🔍 DEBUG: Log detallado de los datos extraídos del FormData
+    console.log('🔍 DEBUG: Datos completos extraídos del FormData:')
+    for (const [key, value] of Object.entries(documentData)) {
+      console.log(`  ${key}: "${value}" (${typeof value})`)
+    }
+    
+    // 🔍 DEBUG: Log de todos los entries del FormData original
+    console.log('🔍 DEBUG: Todos los entries del FormData original:')
+    const formDataEntries = []
+    for (const [key, value] of formData.entries()) {
+      if (!(value instanceof File)) {
+        formDataEntries.push({ key, value, type: typeof value })
+      }
+    }
+    console.log('FormData entries (no-files):', formDataEntries)
+    
     console.log('Generando documento Word para email con imágenes...')
     
     // Generar documento Word con imágenes
-    let documentBlob: Blob
+    let documentBlob: Blob | null = null
+    let documentError: string | null = null
     try {
       documentBlob = await generateDocumentBlob(documentData, caseType, undefined, imageFiles)
       console.log('Documento generado exitosamente con imágenes para email')
     } catch (error) {
       console.error('Error generando documento:', error)
-      return NextResponse.json(
-        { success: false, error: 'Error al generar el documento con imágenes' },
-        { status: 500 }
-      )
+      documentError = error instanceof Error ? error.message : 'Error desconocido'
+      console.warn('⚠️ Continuando sin documento adjunto debido a error en plantilla')
+      // No fallar el proceso, continuar sin documento
     }
     
     // Validar configuración SMTP
@@ -483,6 +500,7 @@ export async function POST(request: NextRequest) {
     try {
       info = await transporter.sendMail(mailOptions)
       console.log('Correo enviado exitosamente:', info.messageId)
+      console.log('🔥 PUNTO DE CONTROL: Correo enviado, ahora proceder a crear caso')
     } catch (error) {
       console.error('Error enviando correo:', error)
       
@@ -517,6 +535,75 @@ export async function POST(request: NextRequest) {
     const hasImages = imageFiles.length > 0
     const hasVideos = videoFiles.length > 0
     
+    // CREAR CASO EN EL BACKEND después del envío exitoso del correo
+    console.log('=== CREANDO CASO EN EL BACKEND ===')
+    console.log('Datos disponibles para caso:', {
+      nombreEmpresa_delModal: nombreEmpresa, // 🔥 USANDO DATO DEL MODAL
+      documentData_nombreEmpresa: documentData.nombreEmpresa,
+      caseType: caseType,
+      messageId: info?.messageId,
+      hasToken: !!request.cookies.get('auth_token')?.value
+    })
+    
+    try {
+      // Extraer el token de las cookies del request
+      const token = request.cookies.get('auth_token')?.value
+      
+      console.log('🔍 VERIFICANDO CONDICIONES PARA CREAR CASO:')
+      console.log('  - Token presente:', !!token)
+      console.log('  - Nombre empresa (modal):', nombreEmpresa) // 🔥 USANDO DATO DEL MODAL
+      console.log('  - Tipo caso:', caseType)
+      console.log('  - Message ID:', info?.messageId)
+      
+      if (token && nombreEmpresa && caseType && info.messageId) { // 🔥 USANDO DATO DEL MODAL
+        const casePayload = {
+          type: caseType,
+          companyName: nombreEmpresa, // 🔥 USANDO DATO DEL MODAL
+          messageId: info.messageId
+        }
+        
+        console.log('✅ Todos los datos están disponibles. Enviando datos del caso al backend:', casePayload)
+        console.log('URL del backend:', `${process.env.BACKEND_URL || 'http://localhost:8080'}/cases`)
+        
+        // Llamar DIRECTAMENTE al backend real
+        const caseResponse = await fetch(`${process.env.BACKEND_URL || 'http://localhost:8080'}/cases`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` // Usar Authorization header estándar
+          },
+          body: JSON.stringify(casePayload)
+        })
+        
+        console.log('Respuesta del endpoint de casos - Status:', caseResponse.status)
+        
+        if (caseResponse.ok) {
+          const caseData = await caseResponse.json()
+          console.log('✅ Caso creado exitosamente en el backend:', caseData)
+        } else {
+          const errorText = await caseResponse.text()
+          console.error('❌ Error creando caso en el backend:', errorText)
+          // No fallar el envío del correo si falla la creación del caso
+        }
+      } else {
+        console.warn('❌ Datos insuficientes para crear caso:', {
+          hasToken: !!token,
+          hasNombreEmpresa: !!nombreEmpresa, // 🔥 USANDO DATO DEL MODAL
+          hasCaseType: !!caseType,
+          hasMessageId: !!info?.messageId,
+          token: token ? 'presente' : 'ausente',
+          nombreEmpresa: nombreEmpresa || 'ausente', // 🔥 USANDO DATO DEL MODAL
+          caseType: caseType || 'ausente',
+          messageId: info?.messageId || 'ausente'
+        })
+      }
+    } catch (caseError) {
+      console.error('❌ Error al intentar crear caso:', caseError)
+      // No fallar el envío del correo si falla la creación del caso
+    }
+    
+    console.log('🎯 DESPUÉS DE INTENTAR CREAR CASO - Preparando respuesta')
+    
     const successResponse = { 
       success: true, 
       message: 'Correo enviado exitosamente con imágenes y videos',
@@ -535,7 +622,8 @@ export async function POST(request: NextRequest) {
         ].filter(Boolean).join(' + ')
       }
     }
-    console.log('Respuesta exitosa:', successResponse)
+    console.log('🏁 FINAL: Respuesta exitosa preparada:', successResponse)
+    console.log('🏁 FINAL: Retornando respuesta al cliente')
     
     return NextResponse.json(successResponse)
 

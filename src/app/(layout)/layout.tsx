@@ -1,15 +1,26 @@
+"use client"
+
+import { useEffect } from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import {
   SidebarInset,
   SidebarProvider,
 } from "@/components/ui/sidebar"
+import { useAuthStore } from "@/store/auth"
 
 export default function LayoutApp({
     children,
     }: {
     children: React.ReactNode
 }) {
+  const { checkAuth } = useAuthStore()
+
+  useEffect(() => {
+    // Verificar autenticación al cargar el layout
+    checkAuth()
+  }, [checkAuth])
+
   return (
     <SidebarProvider
       style={

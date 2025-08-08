@@ -213,6 +213,7 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
       formDataWithEmail.append('emailRecipients', JSON.stringify(emailData.recipients))
       formDataWithEmail.append('emailSubject', emailData.subject)
       formDataWithEmail.append('emailMessage', emailData.message)
+      formDataWithEmail.append('nombreEmpresa', emailData.nombreEmpresa) // 🔥 AGREGADO: Nombre de empresa del modal
       formDataWithEmail.append('caseType', caseType)
       
       // Enviar a la API
