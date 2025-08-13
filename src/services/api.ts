@@ -2,6 +2,7 @@ import { apiClient } from '@/lib/api-client';
 import { 
   LoginRequest, 
   LoginResponse, 
+  OAuthStatus,
   DashboardStatistics, 
   ChartDataPoint, 
   CasesResponse, 
@@ -12,6 +13,11 @@ import {
 export const authService = {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     return apiClient.post<LoginResponse>('/auth/login', credentials);
+  },
+
+  // Verificar estado de OAuth
+  async checkOAuthStatus(): Promise<OAuthStatus> {
+    return apiClient.get<OAuthStatus>('/oauth/status');
   },
 };
 

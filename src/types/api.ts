@@ -12,6 +12,12 @@ export interface LoginResponse {
   };
 }
 
+// OAuth types
+export interface OAuthStatus {
+  isAuthorized: boolean;
+  message: string;
+}
+
 // Dashboard types
 export interface StatisticItem {
   count: number;

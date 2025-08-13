@@ -30,13 +30,19 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     tokenUtils.removeToken();
+    
+    // Limpiar cache de OAuth
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('oauth_status_cache');
+    }
+    
     set({ user: null, isAuthenticated: false });
     if (typeof window !== 'undefined') {
       window.location.href = '/';
     }
   },
 
-  checkAuth: async () => {
+  checkAuth: () => {
     set({ isLoading: true });
     
     const hasToken = tokenUtils.hasToken();

@@ -8,7 +8,7 @@ export function middleware(request: NextRequest) {
   console.log(`🔍 Middleware checking: ${pathname}, Token: ${token ? 'present' : 'missing'}`);
 
   // Rutas públicas que NO requieren autenticación
-  const publicPaths = ['/'];
+  const publicPaths = ['/', '/auth/callback'];
 
   // Verificar si la ruta actual es pública
   const isPublicPath = publicPaths.includes(pathname);

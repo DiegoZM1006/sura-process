@@ -1,3 +1,5 @@
+/* eslint-disable prefer-const */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import { generateDocumentBlob } from '@/lib/document-generator-server'
