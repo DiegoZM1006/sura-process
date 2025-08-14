@@ -257,6 +257,9 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
       formDataWithEmail.append('emailMessage', emailData.message)
       formDataWithEmail.append('nombreEmpresa', emailData.nombreEmpresa) // 🔥 AGREGADO: Nombre de empresa del modal
       formDataWithEmail.append('caseType', caseType)
+      const oauthStatusCache = localStorage.getItem('oauth_status_cache')
+      const senderEmail = oauthStatusCache ? JSON.parse(oauthStatusCache).userEmail as string : ""
+      formDataWithEmail.append('senderEmail', senderEmail) // Email del remitente para obtener su token
       
       // Enviar a la API
       const response = await fetch('/api/send-email', {
