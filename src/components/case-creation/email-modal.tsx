@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { X, Mail, Plus, Video, Upload, Trash2, Play } from "lucide-react"
+import { useAuthStore } from "@/store/auth"
 
 interface EmailModalProps {
   isOpen: boolean
@@ -37,6 +38,7 @@ export function EmailModal({ isOpen, onClose, onSend, caseType }: EmailModalProp
   const [currentEmail, setCurrentEmail] = useState("")
   const [nombreEmpresa, setNombreEmpresa] = useState("")
   const [videos, setVideos] = useState<VideoFile[]>([])
+  const { user } = useAuthStore()
   const [subject, setSubject] = useState("RECLAMACION RESPONSABILIDAD CIVIL EXTRACONTRACTUAL")
   const [message, setMessage] = useState(`Estimados señores
 
@@ -50,14 +52,14 @@ Agradecemos su pronta revisión y respuesta.
 
 Cordialmente,
 
-Juan Esteban Silva
+${user?.fullName}
 Abogado
 BTL Legal Group
 Avenida 6AN # 25N - 22 Piso 3
 Edificio Nexxus XXV
-Celular: 323 621 4498
+Celular: ${user?.phone}
 Teléfono (2) 4852303 y 4853993
-subrogacion10@btlegalgroup.com
+${user?.email}
 Santiago de Cali - Colombia`)
   const [isLoading, setIsLoading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({})
@@ -235,14 +237,14 @@ Agradecemos su pronta revisión y respuesta.
 
 Cordialmente,
 
-Juan Esteban Silva
+${user?.fullName}
 Abogado
 BTL Legal Group
 Avenida 6AN # 25N - 22 Piso 3
 Edificio Nexxus XXV
-Celular: 323 621 4498
+Celular: ${user?.phone}
 Teléfono (2) 4852303 y 4853993
-subrogacion10@btlegalgroup.com
+${user?.email}
 Santiago de Cali - Colombia`)
       onClose()
     } catch (error) {

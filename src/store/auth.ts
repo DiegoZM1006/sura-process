@@ -54,13 +54,15 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     try {
       // Extraer el email del JWT
-      const emailFromToken = tokenUtils.getEmailFromToken();
+      const tokenData = tokenUtils.getTokenData();
       
       // Si hay token, crear usuario con el email del JWT
       const user = {
         id: '1',
-        email: emailFromToken || 'usuario@btllegal.com',
-        name: emailFromToken || 'usuario@btllegal.com' // Usar el email también como nombre
+        email: tokenData.email || 'usuario@btllegal.com',
+        name: tokenData.email || 'usuario@btllegal.com', // Usar el email también como nombre
+        fullName: tokenData.fullName || 'Usuario BTL Legal',
+        phone: tokenData.phone || '1234567890', // Número de teléfono por defecto
       };
       
       set({ 

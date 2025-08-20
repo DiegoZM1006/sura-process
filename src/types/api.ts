@@ -9,6 +9,8 @@ export interface LoginResponse {
   user: {
     id: string;
     email: string;
+    fullName: string;
+    phone: string;
   };
 }
 
@@ -50,6 +52,8 @@ export type CaseType = 'CONSULTA' | 'RECLAMO' | 'DENUNCIA';
 export interface User {
   id: string;
   email: string;
+  fullName: string;
+  phone: string;
 }
 
 export interface Case {

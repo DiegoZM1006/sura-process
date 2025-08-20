@@ -8,7 +8,7 @@ import {
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
-// import { NavUser } from "@/components/nav-user"
+import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
   SidebarContent,
@@ -18,6 +18,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { useAuthStore } from "@/store/auth"
 
 const data = {
   navMain: [
@@ -35,6 +36,9 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+
+  const { user } = useAuthStore();
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -56,7 +60,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={data.navMain} />
       </SidebarContent>
       <SidebarFooter>
-        {/*<NavUser />*/}
+        <NavUser
+          user={{
+            name: user?.fullName ?? "Invitado",
+            email: user?.email ?? "invitado@example.com",
+            avatar: ""
+          }}
+        />
       </SidebarFooter>
     </Sidebar>
   )
