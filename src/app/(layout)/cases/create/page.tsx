@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSearchParams } from "next/navigation"
-import { CheckIcon } from "lucide-react"
+import { useSearchParams, useRouter } from "next/navigation"
+import { CheckIcon, X } from "lucide-react"
 import TiptapEditor from "@/components/tiptap-editor"
 import { StepOne } from "@/components/case-creation/step-one"
 import { StepTwo } from "@/components/case-creation/step-two"
@@ -23,11 +23,49 @@ const CASE_TYPE_MAPPING: Record<string, string> = {
     "rce-solo-deducible-objecion": "RCE SOLO DEDUCIBLE + OBJECION",
 }
 
+// Componente Modal
+const SuccessModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
+    if (!isOpen) return null
+
+    return (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 backdrop-blur-sm">
+            <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full mx-4 relative transform transition-all duration-300 scale-100">
+                <button
+                    onClick={onClose}
+                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                >
+                    <X className="h-6 w-6" />
+                </button>
+                
+                <div className="text-center">
+                    <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+                        <CheckIcon className="h-8 w-8 text-green-600" />
+                    </div>
+                    
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                        ¡Caso Creado Exitosamente!
+                    </h3>
+                    
+                    <p className="text-gray-600 mb-4">
+                        El caso ha sido creado y enviado correctamente.
+                    </p>
+                    
+                    <div className="text-sm text-gray-500">
+                        Redirigiendo en 2 segundos...
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 export default function CreateCasePage() {
     const searchParams = useSearchParams()
+    const router = useRouter()
     const [currentStep, setCurrentStep] = useState(1)
     const [caseType, setCaseType] = useState<string>("")
     const [documentImages, setDocumentImages] = useState<any[]>([]) // Nuevo estado para imágenes
+    const [showModal, setShowModal] = useState(false) // Estado para el modal
     const [steps, setSteps] = useState([
         { id: 1, name: "Información Básica", status: "current" },
         { id: 2, name: "Anexos", status: "upcoming" },
@@ -122,9 +160,22 @@ export default function CreateCasePage() {
     const handleFinish = () => {
         console.log('Caso finalizado exitosamente:', formData)
         console.log('Imágenes del documento:', documentImages.length)
+        
+        // Mostrar el modal
+        setShowModal(true)
+        
+        // Después de 2 segundos, cerrar modal y redirigir
+        setTimeout(() => {
+            setShowModal(false)
+            router.push('/cases')
+        }, 2000)
+        
         // Aquí iría la lógica para guardar el caso en la base de datos
-        // Por ejemplo, redirigir a la lista de casos
-        alert('Caso creado y enviado exitosamente!')
+    }
+
+    const handleCloseModal = () => {
+        setShowModal(false)
+        router.push('/cases')
     }
 
     const renderStepContent = () => {
@@ -250,6 +301,9 @@ export default function CreateCasePage() {
                     </>
                 )}
             </div>
+
+            {/* Modal de éxito */}
+            <SuccessModal isOpen={showModal} onClose={handleCloseModal} />
         </div>
     )
 }
