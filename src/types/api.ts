@@ -69,8 +69,30 @@ export interface Case {
   user: User;
 }
 
+// Nuevo tipo para el overview de casos con información del abogado
+export interface CaseOverview {
+  casoImplicado: string;
+  fechaNotificacion: string;
+  vencimiento: string;
+  correoAbogado: string;
+  abogadoEncargado: string;
+  status: CaseStatus;
+}
+
 export interface CasesResponse {
   cases: Case[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
+export interface CasesOverviewResponse {
+  cases: CaseOverview[];
   pagination: {
     page: number;
     limit: number;

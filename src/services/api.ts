@@ -7,6 +7,7 @@ import {
   ChartDataPoint, 
   CasesResponse, 
   CasesQueryParams,
+  CasesOverviewResponse,
   ChartPeriod 
 } from '@/types/api';
 
@@ -44,5 +45,20 @@ export const casesService = {
     const endpoint = queryString ? `/cases?${queryString}` : '/cases';
     
     return apiClient.get<CasesResponse>(endpoint);
+  },
+
+  // Nuevo método para obtener overview de casos con información del abogado
+  async getCasesOverview(params: CasesQueryParams = {}): Promise<CasesOverviewResponse> {
+    const searchParams = new URLSearchParams();
+    
+    if (params.page) searchParams.append('page', params.page.toString());
+    if (params.limit) searchParams.append('limit', params.limit.toString());
+    if (params.status) searchParams.append('status', params.status);
+    if (params.search) searchParams.append('search', params.search);
+
+    const queryString = searchParams.toString();
+    const endpoint = queryString ? `/cases/all-cases-overview?${queryString}` : '/cases/all-cases-overview';
+    
+    return apiClient.get<CasesOverviewResponse>(endpoint);
   },
 };

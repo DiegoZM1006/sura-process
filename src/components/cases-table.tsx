@@ -64,7 +64,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 
-import { Case, CaseStatus, CasesQueryParams } from "@/types/api"
+import { CaseOverview, CaseStatus, CasesQueryParams } from "@/types/api"
 import { casesService } from "@/services/api"
 import { useToast } from "@/hooks/use-toast"
 
@@ -80,7 +80,7 @@ const statusColors: Record<CaseStatus, string> = {
   'CONTESTADO': 'bg-green-200 text-green-800',
 }
 
-const columns: ColumnDef<Case>[] = [
+const columns: ColumnDef<CaseOverview>[] = [
   {
     id: "select",
     header: ({ table }) => (
@@ -108,39 +108,53 @@ const columns: ColumnDef<Case>[] = [
     enableHiding: false,
   },
   {
-    accessorKey: "userCaseId",
-    header: "# Caso",
+    accessorKey: "casoImplicado",
+    header: "Implicado",
     cell: ({ row }) => (
-      <div className="font-medium">
-        {row.original.userCaseId}
+      <div className="max-w-48 truncate">
+        {row.original.casoImplicado}
       </div>
     ),
     enableHiding: false,
   },
   {
-    accessorKey: "companyName",
-    header: "Implicado",
-    cell: ({ row }) => (
-      <div className="max-w-48 truncate">
-        {row.original.companyName}
-      </div>
-    ),
-  },
-  {
-    accessorKey: "sentAt",
+    accessorKey: "fechaNotificacion",
     header: "Fecha de Notificación",
     cell: ({ row }) => (
       <div className="text-sm">
-        {new Date(row.original.sentAt).toLocaleDateString('es-ES')}
+        {new Date(row.original.fechaNotificacion).toLocaleDateString('es-ES')}
       </div>
     ),
   },
   {
-    accessorKey: "deadline",
+    accessorKey: "vencimiento",
     header: "Fecha de vencimiento",
     cell: ({ row }) => (
       <div className="text-sm">
-        {new Date(row.original.deadline).toLocaleDateString('es-ES')}
+        {new Date(row.original.vencimiento).toLocaleDateString('es-ES')}
+      </div>
+    ),
+  },
+  {
+    accessorKey: "abogadoEncargado",
+    header: "Abogado Encargado",
+    cell: ({ row }) => (
+      <div className="text-sm">
+        {row.original.abogadoEncargado}
+      </div>
+    ),
+  },
+  {
+    accessorKey: "correoAbogado",
+    header: "Correo del Abogado",
+    cell: ({ row }) => (
+      <div className="text-sm">
+        <a 
+          href={`mailto:${row.original.correoAbogado}`}
+          className="text-blue-600 hover:text-blue-800 underline"
+        >
+          {row.original.correoAbogado}
+        </a>
       </div>
     ),
   },
@@ -148,7 +162,7 @@ const columns: ColumnDef<Case>[] = [
     accessorKey: "status",
     header: "Estado",
     cell: ({ row }) => {
-      const status = row.original.status;
+      const status = row.original.status as CaseStatus;
       
       return (
         <Badge className={`gap-1 px-2 ${statusColors[status]}`}>
@@ -163,11 +177,11 @@ const columns: ColumnDef<Case>[] = [
 ]
 
 interface DataTableProps {
-  data?: Case[]
+  data?: CaseOverview[]
 }
 
 export function DataTable({ data: initialData }: DataTableProps) {
-  const [data, setData] = React.useState<Case[]>(initialData || [])
+  const [data, setData] = React.useState<CaseOverview[]>(initialData || [])
   const [loading, setLoading] = React.useState(!initialData)
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -208,7 +222,7 @@ export function DataTable({ data: initialData }: DataTableProps) {
         queryParams.status = params.status as CaseStatus
       }
 
-      const response = await casesService.getCases(queryParams)
+      const response = await casesService.getCasesOverview(queryParams)
       setData(response.cases)
       setTotalPages(response.pagination.totalPages)
       setTotalCount(response.pagination.total)
