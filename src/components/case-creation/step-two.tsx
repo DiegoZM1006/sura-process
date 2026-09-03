@@ -4,10 +4,11 @@ import { useState } from "react"
 import { Upload, X, FileText, Image, File } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import type { CaseFormData } from "./types"
 
 interface StepTwoProps {
-  formData: any
-  updateFormData: (data: any) => void
+  formData: CaseFormData
+  updateFormData: (data: CaseFormData) => void
   onNext: () => void
   onPrev: () => void
 }
@@ -43,7 +44,7 @@ export function StepTwo({ formData, updateFormData, onNext, onPrev }: StepTwoPro
 
   const removeFile = (index: number) => {
     const currentAnexos = formData.anexos || []
-    const updatedAnexos = currentAnexos.filter((_: any, i: number) => i !== index)
+    const updatedAnexos = currentAnexos.filter((_: File, i: number) => i !== index)
     updateFormData({ ...formData, anexos: updatedAnexos })
   }
 

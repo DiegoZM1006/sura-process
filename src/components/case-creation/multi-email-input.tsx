@@ -5,11 +5,19 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Plus, X } from "lucide-react";
 
-export function MultiEmailInput({ value, onChange, label = "Correos Empresa", placeholder = "Ingrese correo y presione Enter o +", id = "correoEmpresa" }) {
-  const [input, setInput] = useState("");
-  const [emails, setEmails] = useState(Array.isArray(value) ? value : value ? [value] : []);
+interface MultiEmailInputProps {
+  value: string | string[]
+  onChange: (emails: string[]) => void
+  label?: string
+  placeholder?: string
+  id?: string
+}
 
-  const isValidEmail = (email) => {
+export function MultiEmailInput({ value, onChange, label = "Correos Empresa", placeholder = "Ingrese correo y presione Enter o +", id = "correoEmpresa" }: MultiEmailInputProps) {
+  const [input, setInput] = useState("");
+  const [emails, setEmails] = useState<string[]>(Array.isArray(value) ? value : value ? [value] : []);
+
+  const isValidEmail = (email: string) => {
     // Simple email regex
     return /.+@.+\..+/.test(email);
   };
@@ -24,13 +32,13 @@ export function MultiEmailInput({ value, onChange, label = "Correos Empresa", pl
     }
   };
 
-  const removeEmail = (email) => {
+  const removeEmail = (email: string) => {
     const newEmails = emails.filter((e) => e !== email);
     setEmails(newEmails);
     onChange(newEmails);
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if ((e.key === "Enter" || e.key === ",") && input) {
       e.preventDefault();
       addEmail();

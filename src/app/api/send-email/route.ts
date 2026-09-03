@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
-import { generateDocumentBlob } from '@/lib/document-generator-server'
+import { generateDocumentBlob, type FormDataBag } from '@/lib/document-generator-server'
 import { mergePDFsWithAnnexes } from '@/lib/pdf-merger'
+import type {
+  ExtractedImage,
+  ImageMetadataEntry,
+  ExtractedVideo,
+  VideoMetadataEntry,
+  HechoInput,
+} from '@/lib/document-form-types'
 
 export async function GET() {
   return NextResponse.json({ 
@@ -74,12 +81,12 @@ export async function POST(request: NextRequest) {
     
     // Extraer datos del formulario para generar el documento
     console.log('Extrayendo datos del formulario...')
-    const documentData: any = {}
+    const documentData: FormDataBag = {}
     const anexoFiles: File[] = []
-    const imageFiles: any[] = []
-    const videoFiles: any[] = [] // Nuevo array para videos
-    let imageMetadata: any[] = []
-    let videoMetadata: any[] = []
+    const imageFiles: ExtractedImage[] = []
+    const videoFiles: ExtractedVideo[] = [] // Nuevo array para videos
+    let imageMetadata: ImageMetadataEntry[] = []
+    let videoMetadata: VideoMetadataEntry[] = []
     
     for (const [key, value] of formData.entries()) {
       if (key === 'anexos' && value instanceof File) {
@@ -163,10 +170,10 @@ export async function POST(request: NextRequest) {
     imageFiles.forEach(imgFile => {
       const metadata = imageMetadata.find(m => m.id === imgFile.index)
       if (metadata) {
-        imgFile.width = metadata.width
-        imgFile.height = metadata.height
-        imgFile.name = metadata.name
-        console.log(`Metadatos aplicados a imagen ${imgFile.index} para email: ${metadata.width}x${metadata.height}`)
+        imgFile.width = metadata.width ?? imgFile.width
+        imgFile.height = metadata.height ?? imgFile.height
+        imgFile.name = metadata.name ?? imgFile.name
+        console.log(`Metadatos aplicados a imagen ${imgFile.index} para email: ${imgFile.width}x${imgFile.height}`)
       }
     })
 
@@ -174,7 +181,7 @@ export async function POST(request: NextRequest) {
     videoFiles.forEach(videoFile => {
       const metadata = videoMetadata.find(m => m.id === videoFile.index)
       if (metadata) {
-        videoFile.name = metadata.name || videoFile.name
+        videoFile.name = metadata.name ?? videoFile.name
         console.log(`Metadatos aplicados a video ${videoFile.index} para email: ${videoFile.name}`)
       }
     })
@@ -197,17 +204,17 @@ export async function POST(request: NextRequest) {
     // Generar documento Word con imágenes
     let documentBlob: Blob
     try {
-      let hechos: any = formData.get('hechos')
-      let hechosArray = undefined
-      if (hechos) {
+      const hechosRaw = formData.get('hechos')
+      let hechosArray: HechoInput[] | undefined
+      if (hechosRaw) {
         try {
-          hechosArray = JSON.parse(hechos as string)
+          hechosArray = JSON.parse(hechosRaw as string) as HechoInput[]
         } catch (e) {
           console.error('Error parseando Hechos:', e)
           hechosArray = undefined
         }
       }
-      hechosArray.forEach((hecho: any) => {
+      hechosArray?.forEach((hecho) => {
         // Procesar cada hecho
         console.log(`Procesando hecho: ${hecho.descripcionHecho} con ID ${hecho.id}`)
       })
@@ -380,7 +387,6 @@ export async function POST(request: NextRequest) {
             // Crear un nombre de archivo limpio y único
             const timestamp = Date.now()
             const fileExtension = video.name.split('.').pop() || 'mp4'
-            const cleanName = video.name.replace(/[^a-zA-Z0-9._-]/g, '_') // Limpiar caracteres especiales
             const fileName = `video_evidencia_${i + 1}_${timestamp}.${fileExtension}`
             
             // Determinar el tipo MIME correcto
@@ -420,7 +426,7 @@ export async function POST(request: NextRequest) {
     console.log(`Total de anexos preparados: ${attachments.length}`)
 
     // Agregar información sobre imágenes y videos al mensaje del email
-    let emailMessageWithMedia = emailMessage
+    const emailMessageWithMedia = emailMessage
 
     {/*
           // ${imageFiles.length > 0 ? `

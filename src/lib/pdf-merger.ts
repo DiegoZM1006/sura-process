@@ -1,4 +1,4 @@
-import { PDFDocument, degrees } from 'pdf-lib'
+import { PDFDocument, PDFPage } from 'pdf-lib'
 
 /**
  * Combina múltiples PDFs en un solo documento
@@ -26,7 +26,6 @@ export async function mergePDFsWithAnnexes(
     // Si la última página está en blanco, no la agregues
     if (mainPageIndices.length > 0) {
       const lastPageIdx = mainPageIndices[mainPageIndices.length - 1];
-      const lastPage = await mainPdf.getPage(lastPageIdx);
       const copiedLastPage = (await mergedPdf.copyPages(mainPdf, [lastPageIdx]))[0];
       if (isPageBlank(copiedLastPage)) {
         mainPagesToCopy = mainPageIndices.slice(0, -1);
@@ -118,8 +117,8 @@ export async function mergePDFsWithAnnexes(
           console.log('Tipo de archivo no soportado para merge, creando página informativa...')
           
           const page = mergedPdf.addPage()
-          const { width, height } = page.getSize()
-          
+          const { height } = page.getSize()
+
           // Agregar texto informativo sobre el archivo
           page.drawText('ANEXO NO PROCESABLE', {
             x: 50,
@@ -165,8 +164,8 @@ export async function mergePDFsWithAnnexes(
         
         // Crear una página de error
         const page = mergedPdf.addPage()
-        const { width, height } = page.getSize()
-        
+        const { height } = page.getSize()
+
         page.drawText('ERROR AL PROCESAR ANEXO', {
           x: 50,
           y: height - 100,
@@ -258,12 +257,16 @@ export async function convertImageToPdf(imageBuffer: Buffer, mimetype: string): 
   }
 }
 
-// Helper para detectar si una página está en blanco (sin contenido visible)
-function isPageBlank(page: any) {
-  // pdf-lib: page.node.Contents puede ser undefined o vacío si la página está en blanco
+// Helper para detectar si una página está en blanco (sin contenido visible).
+// pdf-lib no expone una API pública para esto, así que se accede a
+// `page.node.Contents()`, un detalle interno de su implementación no
+// cubierto por sus tipos públicos.
+function isPageBlank(page: PDFPage) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const internalPage = page as any
   // page.getContentStream() no existe, pero page.node.Contents sí
   // Si Contents es undefined o un array vacío, la página está en blanco
-  const contents = page.node.Contents();
+  const contents = internalPage.node.Contents();
   if (!contents) return true;
   if (Array.isArray(contents) && contents.length === 0) return true;
   // Si es un solo objeto, revisamos su tamaño

@@ -12,9 +12,7 @@ const formatCurrency = (value: string | number) => {
 
 import Docxtemplater from 'docxtemplater'
 import PizZip from 'pizzip'
-
-// @ts-ignore - Módulo sin tipos
-const ImageModule = require('docxtemplater-image-module')
+import ImageModule from 'docxtemplater-image-module'
 
 // Función helper para convertir archivo a ArrayBuffer
 const fileToArrayBuffer = (file: File): Promise<ArrayBuffer> => {
@@ -104,12 +102,7 @@ const prepareTemplateData = async (formData: FormData) => {
   ]
   const mesActual = monthNames[fechaActual.getMonth()]
   const añoActual = fechaActual.getFullYear().toString()
-  
-  // Construir fecha del accidente desde día, mes y año separados
-  const fechaAccidenteCompleta = formData.diaAccidente && formData.mesAccidente && formData.añoAccidente
-    ? `${formData.diaAccidente} de ${formData.mesAccidente} del ${formData.añoAccidente}`
-    : 'XXX de XXXX del 2024'
-  
+
   // Preparar lista de anexos e imágenes
   const anexosList = formData.anexos ? formData.anexos.map((file, index) => ({
     numero: index + 5, // Los primeros 4 anexos son documentos estándar
@@ -270,8 +263,11 @@ export const generateDocumentBlob = async (formData: FormData, caseType: string)
     const arrayBuffer = await response.arrayBuffer()
     const zip = new PizZip(arrayBuffer)
     
-    // Configurar las opciones del módulo de imágenes
+    // Configurar las opciones del módulo de imágenes.
+    // `docxtemplater-image-module` no publica tipos: la forma de `meta` la
+    // define la librería en tiempo de ejecución.
     const imageOptions = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       getImage(tagValue: ArrayBuffer, tagName: string, meta: any) {
         console.log('Procesando imagen:', { tagName, meta })
         // Validar que tagValue sea un ArrayBuffer válido
@@ -310,14 +306,18 @@ export const generateDocumentBlob = async (formData: FormData, caseType: string)
     
     // Si no hay imágenes, eliminar el campo images para evitar errores
     if (!templateData.images || templateData.images.length === 0) {
-      const { images, ...templateDataWithoutImages } = templateData
+      const templateDataWithoutImages = Object.fromEntries(
+        Object.entries(templateData).filter(([key]) => key !== 'images')
+      )
       doc.render(templateDataWithoutImages)
     } else {
       try {
         doc.render(templateData)
       } catch (error) {
         console.error('Error al renderizar con imágenes:', error)
-        const { images, ...templateDataWithoutImages } = templateData
+        const templateDataWithoutImages = Object.fromEntries(
+        Object.entries(templateData).filter(([key]) => key !== 'images')
+      )
         doc.render(templateDataWithoutImages)
       }
     }

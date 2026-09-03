@@ -1,28 +1,14 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import {
-  IconCamera,
-  IconChartBar,
   IconDashboard,
-  IconDatabase,
-  IconFileAi,
-  IconFileDescription,
-  IconFileWord,
   IconFolder,
-  IconHelp,
   IconHome,
-  IconInnerShadowTop,
-  IconListDetails,
-  IconReport,
-  IconSearch,
-  IconSettings,
-  IconUsers,
 } from "@tabler/icons-react"
 
-import { NavDocuments } from "@/components/nav-documents"
 import { NavMain } from "@/components/nav-main"
-import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
@@ -33,28 +19,37 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { clearSession, getSession } from "@/lib/auth"
 
-const data = {
-  user: {
-    name: "Jacobo",
-    email: "jacobo@example.com",
-    avatar: "/avatars/shadcn.jpg",
+const navMain = [
+  {
+    title: "Panel de control",
+    url: "/dashboard",
+    icon: IconDashboard,
   },
-  navMain: [
-    {
-      title: "Panel de control",
-      url: "/dashboard",
-      icon: IconDashboard,
-    },
-    {
-      title: "Casos",
-      url: "/cases",
-      icon: IconFolder,
-    }
-  ]
-}
+  {
+    title: "Casos",
+    url: "/cases",
+    icon: IconFolder,
+  },
+]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const router = useRouter()
+  const session = getSession()
+
+  const user = {
+    name: session?.user.fullName || session?.user.email || "Usuario",
+    email: session?.user.email || "",
+    avatar: "/avatars/shadcn.jpg",
+  }
+
+  const handleLogout = () => {
+    clearSession()
+    router.push("/")
+    router.refresh()
+  }
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -73,10 +68,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={navMain} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={user} onLogout={handleLogout} />
       </SidebarFooter>
     </Sidebar>
   )

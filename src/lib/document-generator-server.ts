@@ -1,12 +1,12 @@
 // Helper para formatear cuantía con separador de miles
-const formatCurrency = (value: string | number) => {
+const formatCurrency = (value: unknown) => {
   if (typeof value === 'number') {
     return value.toLocaleString('es-CO');
   }
   if (typeof value === 'string' && value.match(/^\d+$/)) {
     return parseInt(value, 10).toLocaleString('es-CO');
   }
-  return value || 'XXXXXXXX';
+  return (typeof value === 'string' && value) || 'XXXXXXXX';
 };
 
 // Versión server-side del generador de documentos
@@ -18,18 +18,62 @@ import libre from 'libreoffice-convert'
 // Importar el módulo de imágenes gratuito
 import ImageModule from 'docxtemplater-image-module-free'
 
-// Tipo para un hecho individual
+// Tipo para un hecho individual. `id`/`file` de la foto son opcionales
+// porque un hecho puede llegar recién deserializado de JSON (sin el File
+// real todavía; `processHechoImagesFromFormData` lo reasigna después)
+// además de llegar ya completo desde el estado del cliente.
 interface Hecho {
   id: string;
   descripcionHecho: string;
   fotoHecho?: {
-    id: string;
+    id?: string;
     name: string;
     data: string;
-    file: File;
+    file?: File;
     width: number;
     height: number;
   } | null;
+}
+
+/**
+ * `formData` llega aquí desde dos orígenes distintos (el objeto de estado
+ * del wizard del frontend, o un objeto armado a mano desde un FormData
+ * multipart en las rutas API) y su forma exacta varía según el tipo de
+ * caso y qué pasos se completaron. Se trata como un diccionario dinámico
+ * y se valida/normaliza en cada punto donde se lee un campo puntual.
+ */
+export type FormDataBag = Record<string, unknown>
+
+// Contenido de las pestañas del editor (anexos, hechos en texto plano).
+interface TabContents {
+  anexos?: string
+  hechos?: string
+}
+
+// Imagen adicional tal como llega desde el cliente (step-three.tsx) antes
+// de procesarse para la plantilla.
+interface RawImageInput {
+  id?: unknown
+  name?: string
+  width?: number
+  height?: number
+  data?: string
+  file?: File
+}
+
+// Imagen adicional ya lista para pasarle a docxtemplater.
+interface PreparedImage {
+  src: string
+  width: number
+  height: number
+  name: string
+  index: number
+}
+
+// Hecho ya aplanado para el loop de docxtemplater (sin metadatos extra).
+interface HechoTemplateEntry {
+  descripcionHecho: string
+  fotoHecho: string | null
 }
 
 // Función para formatear fechas en español
@@ -51,8 +95,10 @@ const formatDateSpanish = (dateValue: string) => {
 }
 
 // Función helper para formatear valores
-const formatValue = (value: string, defaultText = 'XXXXXXX') => {
-  return value && value.toString().trim() ? value.toString().trim() : defaultText
+const formatValue = (value: unknown, defaultText = 'XXXXXXX') => {
+  if (value === null || value === undefined) return defaultText
+  const text = String(value).trim()
+  return text ? text : defaultText
 }
 
 // Función para convertir base64 DataURL a ArrayBuffer (según documentación)
@@ -79,7 +125,7 @@ function base64DataURLToArrayBuffer(dataURL: string) {
 }
 
 // Función para procesar hechos estructurados desde FormData
-const processHechosFromFormData = (formData: any): Hecho[] => {
+const processHechosFromFormData = (formData: FormDataBag): Hecho[] => {
   try {
     if (formData.hechos && typeof formData.hechos === 'string') {
       const hechosData = JSON.parse(formData.hechos) as Hecho[]
@@ -94,16 +140,16 @@ const processHechosFromFormData = (formData: any): Hecho[] => {
 }
 
 // Función para procesar imágenes de hechos desde FormData
-const processHechoImagesFromFormData = async (formData: any, hechos: Hecho[]): Promise<Hecho[]> => {
+const processHechoImagesFromFormData = async (formData: FormDataBag, hechos: Hecho[]): Promise<Hecho[]> => {
   try {
     const processedHechos = [...hechos]
-    
+
     // Buscar archivos de imágenes de hechos en el FormData
     let imageIndex = 0
     while (formData[`hecho_imagen_${imageIndex}`]) {
       const imageFile = formData[`hecho_imagen_${imageIndex}`]
-      
-      if (imageFile && typeof imageFile === 'object') {
+
+      if (imageFile instanceof File) {
         // Convertir el archivo a data URL
         const buffer = await imageFile.arrayBuffer()
         const uint8Array = new Uint8Array(buffer)
@@ -144,7 +190,7 @@ const processHechoImagesFromFormData = async (formData: any, hechos: Hecho[]): P
 }
 
 // Función para generar hechos de fallback basados en el contenido por defecto
-const generateFallbackHechos = (formData: any, caseType: string): Hecho[] => {
+const generateFallbackHechos = (formData: FormDataBag, caseType: string): Hecho[] => {
   console.log('Generando hechos de fallback para tipo:', caseType);
   
   try {
@@ -172,11 +218,11 @@ const generateFallbackHechos = (formData: any, caseType: string): Hecho[] => {
 
 // Función para preparar los datos para la plantilla - ACTUALIZADA PARA HECHOS COMO LOOP
 const prepareTemplateData = async (
-  formData: any, 
-  caseType: string, 
-  tabContents?: any, 
-  hechosEstructurados?: Hecho[], 
-  imageFiles?: any[]
+  formData: FormDataBag,
+  caseType: string,
+  tabContents?: TabContents,
+  hechosEstructurados?: Hecho[],
+  imageFiles?: RawImageInput[]
 ) => {
   // Obtener fecha actual formateada
   const fechaActual = new Date()
@@ -200,15 +246,15 @@ const prepareTemplateData = async (
   const anexosContent = tabContents?.anexos || formData.contenidoAnexos || getDefaultAnexosContent(formData, caseType)
   
   // PROCESAR HECHOS COMO LOOP ESTRUCTURADO
-  let hechosParaLoop: any[] = []
-  
+  let hechosParaLoop: HechoTemplateEntry[] = []
+
   if (hechosEstructurados && hechosEstructurados.length > 0) {
     console.log('Procesando hechos estructurados para loop:', hechosEstructurados.length)
-    
+
     hechosParaLoop = hechosEstructurados.map((hecho, index) => {
-      const hechoParaTemplate = {
+      const hechoParaTemplate: HechoTemplateEntry = {
         descripcionHecho: hecho.descripcionHecho || `Hecho ${index + 1}`,
-        fotoHecho: null as any
+        fotoHecho: null
       }
       
       // Si el hecho tiene una foto, preparar para docxtemplater
@@ -232,7 +278,7 @@ const prepareTemplateData = async (
     console.log('No hay hechos estructurados, generando por defecto para tipo:', caseType)
     const hechosFallback = generateFallbackHechos(formData, caseType)
     
-    hechosParaLoop = hechosFallback.map((hecho, index) => ({
+    hechosParaLoop = hechosFallback.map((hecho) => ({
       descripcionHecho: hecho.descripcionHecho,
       fotoHecho: null // Los hechos por defecto no tienen imágenes
     }))
@@ -241,8 +287,8 @@ const prepareTemplateData = async (
   }
 
   // Preparar datos de imágenes adicionales para docxtemplater (si las hay - no relacionadas con hechos)
-  let imagenesAdicionales: any[] = []
-  
+  let imagenesAdicionales: PreparedImage[] = []
+
   if (imageFiles && imageFiles.length > 0) {
     console.log('Procesando imágenes adicionales para plantilla:', imageFiles.length)
     
@@ -276,7 +322,7 @@ const prepareTemplateData = async (
         console.error(`Error procesando imagen adicional ${index}:`, error)
         return null
       }
-    }).filter(img => img !== null)
+    }).filter((img): img is PreparedImage => img !== null)
     
     console.log('Imágenes adicionales procesadas para plantilla:', imagenesAdicionales.length)
   }
@@ -296,7 +342,7 @@ const prepareTemplateData = async (
     direccionEmpresa: formatValue(formData.direccionEmpresa, 'XXXXXXXXXXXXXXX'),
     correos: Array.isArray(formData.correoEmpresa)
       ? formData.correoEmpresa.filter((c: string) => !!c && c.trim()).map((c: string) => ({ correoEmpresa: c.trim() }))
-      : formData.correoEmpresa && formData.correoEmpresa.trim()
+      : typeof formData.correoEmpresa === 'string' && formData.correoEmpresa.trim()
         ? [{ correoEmpresa: formData.correoEmpresa.trim() }]
         : [],
 
@@ -348,7 +394,7 @@ const prepareTemplateData = async (
 
 // Función principal actualizada para procesar desde FormData
 export const generateDocumentFromFormData = async (
-  formData: any,
+  formData: FormDataBag,
   caseType: string
 ): Promise<Blob> => {
   try {
@@ -369,24 +415,31 @@ export const generateDocumentFromFormData = async (
     console.log('Hechos con imágenes procesados:', hechosConImagenes.filter(h => h.fotoHecho).length)
     
     // 4. Procesar contenidos de tabs
-    const tabContents = {
-      anexos: formData.contenidoAnexos || getDefaultAnexosContent(formData, caseType),
+    const tabContents: TabContents = {
+      anexos: typeof formData.contenidoAnexos === 'string'
+        ? formData.contenidoAnexos
+        : getDefaultAnexosContent(formData, caseType),
     }
-    
+
     // 5. Procesar imágenes adicionales (las que no son de hechos)
-    const imagenesAdicionales: any[] = []
-    if (formData.imagenesMetadata) {
+    const imagenesAdicionales: RawImageInput[] = []
+    if (typeof formData.imagenesMetadata === 'string') {
       try {
-        const metadata = JSON.parse(formData.imagenesMetadata)
+        const metadata = JSON.parse(formData.imagenesMetadata) as Array<{
+          id?: unknown
+          name?: string
+          width?: number
+          height?: number
+        }>
         for (let i = 0; i < metadata.length; i++) {
           const imageFile = formData[`imagen_${i}`]
-          if (imageFile && typeof imageFile === 'object') {
+          if (imageFile instanceof File) {
             const buffer = await imageFile.arrayBuffer()
             const uint8Array = new Uint8Array(buffer)
             const base64 = Buffer.from(uint8Array).toString('base64')
             const mimeType = imageFile.type || 'image/jpeg'
             const dataUrl = `data:${mimeType};base64,${base64}`
-            
+
             imagenesAdicionales.push({
               id: metadata[i].id,
               name: metadata[i].name,
@@ -422,7 +475,7 @@ export const generateDocumentFromFormData = async (
 // (getDefaultAnexosContent, getDefaultHechosContent, etc.)
 
 // Función para obtener contenido por defecto de anexos según el tipo de caso
-const getDefaultAnexosContent = (formData: any = {}, caseType: string = "") => {
+const getDefaultAnexosContent = (formData: FormDataBag = {}, caseType: string = "") => {
   const numeroPoliza = formData.numeroPolizaSura || '{numeroPolizaSura}';
   const placasPrimerVehiculo = formData.placasPrimerVehiculo || '{placasPrimerVehiculo}';
   const propietarioPrimerVehiculo = formData.propietarioPrimerVehiculo || '{propietarioPrimerVehiculo}';
@@ -546,12 +599,13 @@ const getDefaultAnexosContent = (formData: any = {}, caseType: string = "") => {
 
 7.Copia simple de la Escritura Pública No. 392 del 12 de abril de 2016, a través del cual se otorga la representación legal general al suscrito.`;
 
-    default: 'ELIGE UN TIPO DE CASO PARA GENERAR LOS ANEXOS';
+    default:
+      return 'ELIGE UN TIPO DE CASO PARA GENERAR LOS ANEXOS';
   }
 };
 
 // Función para obtener contenido por defecto de hechos según el tipo de caso
-const getDefaultHechosContent = (formData: any = {}, caseType: string = "") => {
+const getDefaultHechosContent = (formData: FormDataBag = {}, caseType: string = "") => {
   const diaAccidente = formData.diaAccidente || '{diaAccidente}';
   const mesAccidente = formData.mesAccidente || '{mesAccidente}';
   const añoAccidente = formData.añoAccidente || '{añoAccidente}';
@@ -561,8 +615,8 @@ const getDefaultHechosContent = (formData: any = {}, caseType: string = "") => {
   const placasPrimerVehiculo = formData.placasPrimerVehiculo || '{placasPrimerVehiculo}';
   const propietarioPrimerVehiculo = formData.propietarioPrimerVehiculo || '{propietarioPrimerVehiculo}';
   const placasSegundoVehiculo = formData.placasSegundoVehiculo || '{placasSegundoVehiculo}';
-  const propietarioSegundoVehiculo = formData.propietarioSegundoVehiculo?.trim() || '';
-  const afiliador = formData.afiliador?.trim() || '';
+  const propietarioSegundoVehiculo = (typeof formData.propietarioSegundoVehiculo === 'string' ? formData.propietarioSegundoVehiculo.trim() : '') || '';
+  const afiliador = (typeof formData.afiliador === 'string' ? formData.afiliador.trim() : '') || '';
   const conductorVehiculoInfractor = formData.conductorVehiculoInfractor || '{conductorVehiculoInfractor}';
   const cedulaConductorInfractor = formData.cedulaConductorInfractor || '{cedulaConductorInfractor}';
   const numeroPolizaSura = formData.numeroPolizaSura || '{numeroPolizaSura}';
@@ -731,11 +785,11 @@ const getTemplatePath = (caseType: string): string => {
 
 // Función principal del servidor ACTUALIZADA
 export const generateDocumentBlobServer = async (
-  formData: any, 
-  caseType: string, 
-  tabContents?: any,
+  formData: FormDataBag,
+  caseType: string,
+  tabContents?: TabContents,
   hechosEstructurados?: Hecho[],
-  imageFiles?: any[]
+  imageFiles?: RawImageInput[]
 ): Promise<Blob> => {
   try {
     console.log('=== INICIO GENERACIÓN DE DOCUMENTO CON HECHOS COMO LOOP ===')
@@ -761,8 +815,12 @@ export const generateDocumentBlobServer = async (
     console.log('Plantilla cargada, tamaño:', templateBuffer.length, 'bytes')
     const zip = new PizZip(templateBuffer)
     
-    // Configurar el módulo de imágenes según la documentación oficial
+    // Configurar el módulo de imágenes según la documentación oficial.
+    // `docxtemplater-image-module-free` no publica tipos: la forma exacta de
+    // estos callbacks (qué recibe `tag`/`tagValue`) la define la librería en
+    // tiempo de ejecución, no algo que podamos tipar con precisión aquí.
     const imageOpts = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       getImage(tag: any) {
         console.log('getImage llamado con tag:', typeof tag, tag ? tag.substring(0, 50) + '...' : 'undefined');
         
@@ -776,6 +834,7 @@ export const generateDocumentBlobServer = async (
         console.log('Tag no es un data URL válido:', typeof tag);
         return false;
       },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       getSize(img: any, tagValue: any, tagName: string) {
         console.log('getSize llamado para tagName:', tagName, 'tagValue type:', typeof tagValue);
         
@@ -852,16 +911,18 @@ export const generateDocumentBlobServer = async (
       doc.render(templateData)
       console.log('Documento renderizado exitosamente con loop de hechos')
     } catch (renderError) {
+      const message = renderError instanceof Error ? renderError.message : 'Error desconocido'
+      const stack = renderError instanceof Error ? renderError.stack : undefined
       console.error('Error crítico al renderizar documento:', renderError)
       console.error('Detalles del error:', {
-        message: renderError.message,
-        stack: renderError.stack,
+        message,
+        stack,
         templateDataKeys: Object.keys(templateData),
         hechosType: typeof templateData.hechos,
         hechosLength: Array.isArray(templateData.hechos) ? templateData.hechos.length : 'No es array',
         primerHecho: templateData.hechos && templateData.hechos.length > 0 ? templateData.hechos[0] : 'No hay hechos'
       })
-      throw new Error(`Error al renderizar documento: ${renderError instanceof Error ? renderError.message : 'Error desconocido'}`)
+      throw new Error(`Error al renderizar documento: ${message}`)
     }
     
     console.log('Generando documento final...')
@@ -879,7 +940,7 @@ export const generateDocumentBlobServer = async (
       
       // Configurar la ruta de LibreOffice si no está en el PATH
       const libreOfficePath = process.env.LIBREOFFICE_PATH || 'C:\\Program Files\\LibreOffice\\program\\soffice.exe'
-      if (require('fs').existsSync(libreOfficePath)) {
+      if (fs.existsSync(libreOfficePath)) {
         process.env.LIBREOFFICE_PATH = libreOfficePath
         console.log('Configurando ruta de LibreOffice:', libreOfficePath)
       }
@@ -936,17 +997,19 @@ export const generateDocumentBlobServer = async (
 // Función de compatibilidad con el nombre esperado por el route.ts
 export const generateDocumentBlob = generateDocumentBlobServer
 
-// Función auxiliar para validar estructura de hechos
-export const validateHechosStructure = (hechos: any[]): boolean => {
+// Función auxiliar para validar estructura de hechos (recibe datos externos
+// de forma dinámica, por eso el tipo de entrada es deliberadamente laxo).
+export const validateHechosStructure = (hechos: unknown[]): boolean => {
   if (!Array.isArray(hechos)) {
     console.error('validateHechosStructure: hechos no es un array')
     return false;
   }
-  
-  const isValid = hechos.every((hecho, index) => {
+
+  const isValid = hechos.every((hechoInput, index) => {
+    const hecho = hechoInput as { id?: unknown; descripcionHecho?: unknown; fotoHecho?: { data?: unknown } | null }
     const hasValidId = typeof hecho.id === 'string' && hecho.id.trim().length > 0;
     const hasValidDescription = typeof hecho.descripcionHecho === 'string' && hecho.descripcionHecho.trim().length > 0;
-    const hasValidPhoto = hecho.fotoHecho === null || hecho.fotoHecho === undefined || 
+    const hasValidPhoto = hecho.fotoHecho === null || hecho.fotoHecho === undefined ||
       (typeof hecho.fotoHecho === 'object' && typeof hecho.fotoHecho.data === 'string');
     
     if (!hasValidId) console.error(`Hecho ${index}: ID inválido`);

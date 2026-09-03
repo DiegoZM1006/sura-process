@@ -1,13 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useSearchParams } from "next/navigation"
+import { Suspense, useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { CheckIcon } from "lucide-react"
+import { toast } from "sonner"
 import TiptapEditor from "@/components/tiptap-editor"
 import { StepOne } from "@/components/case-creation/step-one"
 import { StepTwo } from "@/components/case-creation/step-two"
 import { StepThree } from "@/components/case-creation/step-three"
 import { EditorFooter } from "@/components/case-creation/editor-footer"
+import type { CaseFormData, DocumentImage } from "@/components/case-creation/types"
 
 // Mapeo de tipos de casos
 const CASE_TYPE_MAPPING: Record<string, string> = {
@@ -24,16 +26,28 @@ const CASE_TYPE_MAPPING: Record<string, string> = {
 }
 
 export default function CreateCasePage() {
+    return (
+        <Suspense fallback={null}>
+            <CreateCasePageContent />
+        </Suspense>
+    )
+}
+
+// `useSearchParams` obliga a Next.js a renderizar esta parte en el cliente;
+// se aísla en un componente propio envuelto en <Suspense> arriba para que
+// el resto de la ruta pueda seguir prerenderizándose.
+function CreateCasePageContent() {
+    const router = useRouter()
     const searchParams = useSearchParams()
     const [currentStep, setCurrentStep] = useState(1)
     const [caseType, setCaseType] = useState<string>("")
-    const [documentImages, setDocumentImages] = useState<any[]>([]) // Nuevo estado para imágenes
+    const [documentImages, setDocumentImages] = useState<DocumentImage[]>([]) // Nuevo estado para imágenes
     const [steps, setSteps] = useState([
         { id: 1, name: "Información Básica", status: "current" },
         { id: 2, name: "Anexos", status: "upcoming" },
         { id: 3, name: "Revisión", status: "upcoming" },
     ])
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<CaseFormData>({
         nombreEmpresa: "",
         nitEmpresa: "",
         correoEmpresa: "",
@@ -71,7 +85,7 @@ export default function CreateCasePage() {
     }
 
     // Handler para cambios en las imágenes
-    const handleImagesChange = (images: any[]) => {
+    const handleImagesChange = (images: DocumentImage[]) => {
         setDocumentImages(images)
         console.log('Imágenes actualizadas:', images.length)
     }
@@ -120,11 +134,10 @@ export default function CreateCasePage() {
     }
 
     const handleFinish = () => {
-        console.log('Caso finalizado exitosamente:', formData)
-        console.log('Imágenes del documento:', documentImages.length)
-        // Aquí iría la lógica para guardar el caso en la base de datos
-        // Por ejemplo, redirigir a la lista de casos
-        alert('Caso creado y enviado exitosamente!')
+        // El caso ya quedó registrado en el backend dentro de StepThree
+        // (handleSendEmail -> createCase) una vez el correo se envió con éxito.
+        toast.success('Caso creado y enviado exitosamente')
+        router.push('/cases')
     }
 
     const renderStepContent = () => {

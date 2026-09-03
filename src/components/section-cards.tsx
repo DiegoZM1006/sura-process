@@ -9,29 +9,61 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import type { DashboardStatistics } from "@/lib/api-client"
 
-export function SectionCards() {
+function ChangeBadge({ change }: { change: number }) {
+  const isPositive = change >= 0
+  const Icon = isPositive ? IconTrendingUp : IconTrendingDown
+  return (
+    <Badge variant="outline">
+      <Icon />
+      {isPositive ? "+" : ""}
+      {change}%
+    </Badge>
+  )
+}
+
+export function SectionCards({
+  stats,
+  isLoading,
+}: {
+  stats: DashboardStatistics | null
+  isLoading: boolean
+}) {
+  if (isLoading || !stats) {
+    return (
+      <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
+        {[0, 1, 2].map((i) => (
+          <Card key={i} className="@container/card">
+            <CardHeader>
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="mt-2 h-8 w-16" />
+            </CardHeader>
+            <CardFooter>
+              <Skeleton className="h-4 w-40" />
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
       <Card className="@container/card">
         <CardHeader>
           <CardDescription>Total de Casos</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            1,456
+            {stats.totalCases.count.toLocaleString("es-CO")}
           </CardTitle>
           <CardAction>
-            <Badge variant="outline">
-              <IconTrendingUp />
-              +8.2%
-            </Badge>
+            <ChangeBadge change={stats.totalCases.change} />
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Incremento este mes <IconTrendingUp className="size-4" />
-          </div>
           <div className="text-muted-foreground">
-            Casos registrados en los últimos 6 meses
+            {stats.totalCases.description}
           </div>
         </CardFooter>
       </Card>
@@ -39,21 +71,15 @@ export function SectionCards() {
         <CardHeader>
           <CardDescription>Casos Pendientes</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            234
+            {stats.pendingCases.count.toLocaleString("es-CO")}
           </CardTitle>
           <CardAction>
-            <Badge variant="outline">
-              <IconTrendingDown />
-              -15%
-            </Badge>
+            <ChangeBadge change={stats.pendingCases.change} />
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Reducción del 15% <IconTrendingDown className="size-4" />
-          </div>
           <div className="text-muted-foreground">
-            Casos en proceso y próximos a vencer
+            {stats.pendingCases.description}
           </div>
         </CardFooter>
       </Card>
@@ -61,20 +87,16 @@ export function SectionCards() {
         <CardHeader>
           <CardDescription>Casos Finalizados</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            1,222
+            {stats.completedCases.count.toLocaleString("es-CO")}
           </CardTitle>
           <CardAction>
-            <Badge variant="outline">
-              <IconTrendingUp />
-              +12.5%
-            </Badge>
+            <ChangeBadge change={stats.completedCases.change} />
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Alta tasa de resolución <IconTrendingUp className="size-4" />
+          <div className="text-muted-foreground">
+            {stats.completedCases.description}
           </div>
-          <div className="text-muted-foreground">Casos cerrados exitosamente</div>
         </CardFooter>
       </Card>
     </div>

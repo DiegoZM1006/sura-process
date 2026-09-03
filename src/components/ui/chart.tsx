@@ -104,6 +104,19 @@ ${colorConfig
 
 const ChartTooltip = RechartsPrimitive.Tooltip
 
+// recharts v3 tipa el contenido del tooltip de forma muy genérica y ya no
+// expone `payload`/`label` como propiedades directas y simples de
+// `ComponentProps<typeof Tooltip>`. En tiempo de ejecución recharts sigue
+// entregando exactamente esta forma, así que se tipa explícitamente en vez
+// de derivarla del componente.
+interface ChartTooltipPayloadItem {
+  dataKey?: string | number
+  name?: string | number
+  value?: number | string
+  color?: string
+  payload?: { fill?: string } & Record<string, unknown>
+}
+
 function ChartTooltipContent({
   active,
   payload,
@@ -118,14 +131,29 @@ function ChartTooltipContent({
   color,
   nameKey,
   labelKey,
-}: React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
-  React.ComponentProps<"div"> & {
-    hideLabel?: boolean
-    hideIndicator?: boolean
-    indicator?: "line" | "dot" | "dashed"
-    nameKey?: string
-    labelKey?: string
-  }) {
+}: React.ComponentProps<"div"> & {
+  active?: boolean
+  payload?: ChartTooltipPayloadItem[]
+  label?: React.ReactNode
+  labelFormatter?: (
+    label: React.ReactNode,
+    payload: ChartTooltipPayloadItem[]
+  ) => React.ReactNode
+  labelClassName?: string
+  formatter?: (
+    value: unknown,
+    name: unknown,
+    item: ChartTooltipPayloadItem,
+    index: number,
+    payload: unknown
+  ) => React.ReactNode
+  color?: string
+  hideLabel?: boolean
+  hideIndicator?: boolean
+  indicator?: "line" | "dot" | "dashed"
+  nameKey?: string
+  labelKey?: string
+}) {
   const { config } = useChart()
 
   const tooltipLabel = React.useMemo(() => {
@@ -182,7 +210,7 @@ function ChartTooltipContent({
         {payload.map((item, index) => {
           const key = `${nameKey || item.name || item.dataKey || "value"}`
           const itemConfig = getPayloadConfigFromPayload(config, item, key)
-          const indicatorColor = color || item.payload.fill || item.color
+          const indicatorColor = color || item.payload?.fill || item.color
 
           return (
             <div
@@ -250,17 +278,27 @@ function ChartTooltipContent({
 
 const ChartLegend = RechartsPrimitive.Legend
 
+// Mismo caso que en ChartTooltipContent: se tipa explícitamente la forma
+// que recharts v3 sigue entregando en tiempo de ejecución en vez de
+// derivarla de `LegendProps`, cuyos tipos públicos cambiaron.
+interface ChartLegendPayloadItem {
+  value?: string | number
+  dataKey?: string | number
+  color?: string
+}
+
 function ChartLegendContent({
   className,
   hideIcon = false,
   payload,
   verticalAlign = "bottom",
   nameKey,
-}: React.ComponentProps<"div"> &
-  Pick<RechartsPrimitive.LegendProps, "payload" | "verticalAlign"> & {
-    hideIcon?: boolean
-    nameKey?: string
-  }) {
+}: React.ComponentProps<"div"> & {
+  payload?: ChartLegendPayloadItem[]
+  verticalAlign?: "top" | "bottom"
+  hideIcon?: boolean
+  nameKey?: string
+}) {
   const { config } = useChart()
 
   if (!payload?.length) {

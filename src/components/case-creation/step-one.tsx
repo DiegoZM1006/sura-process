@@ -6,32 +6,10 @@ import { Input } from "@/components/ui/input"
 import { MultiEmailInput } from "./multi-email-input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { SaveIcon } from "lucide-react"
+import type { CaseFormData } from "./types"
 
 interface StepOneProps {
-  formData: {
-    nombreEmpresa: string
-    nitEmpresa: string
-    correoEmpresa: string | string[]
-    direccionEmpresa: string | string[]
-    telefonoEmpresa: string
-    diaAccidente: string
-    mesAccidente: string
-    añoAccidente: string
-    direccionAccidente: string
-    ciudad: string
-    departamento: string
-    placasPrimerVehiculo: string
-    propietarioPrimerVehiculo: string
-    placasSegundoVehiculo: string
-    propietarioSegundoVehiculo: string
-    afiliador: string
-    conductorVehiculoInfractor: string
-    cedulaConductorInfractor: string
-    numeroPolizaSura: string
-    cuantia: string
-    deducible: string
-  }
+  formData: CaseFormData
   handleInputChange: (field: string, value: string | string[]) => void
   onNext: () => void
   onPrev?: () => void
@@ -39,12 +17,13 @@ interface StepOneProps {
   currentStep: number
 }
 
+// `onNext` e `isStepComplete` forman parte del contrato del wizard (el padre
+// siempre los envía) aunque este paso no los use directamente: el botón que
+// los consumía está comentado más abajo en espera de reactivar validaciones.
 export function StepOne({
   formData,
   handleInputChange,
-  onNext,
   onPrev,
-  isStepComplete,
   currentStep
 }: StepOneProps) {
   return (

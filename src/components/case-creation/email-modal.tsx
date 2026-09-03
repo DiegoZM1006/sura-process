@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { X, Mail, Plus, Video, Upload, Trash2, Play } from "lucide-react"
+import { X, Mail, Plus, Video, Upload, Trash2 } from "lucide-react"
 
 interface EmailModalProps {
   isOpen: boolean
@@ -32,7 +32,10 @@ interface VideoFile {
   preview?: string
 }
 
-export function EmailModal({ isOpen, onClose, onSend, caseType }: EmailModalProps) {
+// `caseType` forma parte del contrato del componente (el caller siempre lo
+// envía junto con los demás datos del caso) aunque este modal no lo use
+// directamente todavía.
+export function EmailModal({ isOpen, onClose, onSend }: EmailModalProps) {
   const [recipients, setRecipients] = useState<string[]>([])
   const [currentEmail, setCurrentEmail] = useState("")
   const [nombreEmpresa, setNombreEmpresa] = useState("")

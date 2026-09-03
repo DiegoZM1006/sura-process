@@ -13,7 +13,14 @@ import React, { useState, useEffect } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { RefreshCw, Plus, Trash2, Upload } from 'lucide-react'
 
-const StyledEditor = ({ formData = {}, caseType = "", tabContents = {}, onTabContentChange, onImagesChange, onHechosChange }) => {
+const StyledEditor = ({
+  formData = {},
+  caseType = "",
+  tabContents = {},
+  onTabContentChange = (_tabId, _content) => {},
+  onImagesChange = (_images) => {},
+  onHechosChange = (_hechos) => {},
+}) => {
   const [activeTab, setActiveTab] = useState("informacion-empresa");
   const [forceRegenerate, setForceRegenerate] = useState(0);
   const [images, setImages] = useState([]);
@@ -953,7 +960,8 @@ export const getDefaultAnexosContent = (formData = {}, caseType = "") => {
 
 7.Copia simple de la Escritura Pública No. 392 del 12 de abril de 2016, a través del cual se otorga la representación legal general al suscrito.`;
 
-    default: 'ELIGE UN TIPO DE CASO PARA GENERAR LOS ANEXOS';
+    default:
+      return 'ELIGE UN TIPO DE CASO PARA GENERAR LOS ANEXOS';
   }
 };
 

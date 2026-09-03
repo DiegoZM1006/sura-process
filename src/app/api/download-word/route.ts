@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateDocumentBlob } from '@/lib/document-generator-server'
+import { generateDocumentBlob, type FormDataBag } from '@/lib/document-generator-server'
 import { mergePDFsWithAnnexes } from '@/lib/pdf-merger'
+import type { ExtractedImage, ImageMetadataEntry, HechoInput } from '@/lib/document-form-types'
 
 export async function POST(request: NextRequest) {
   console.log('=== INICIO DEL PROCESO DE DESCARGA DE WORD CON ANEXOS E IMÁGENES ===')
@@ -20,10 +21,10 @@ export async function POST(request: NextRequest) {
     
     // Extraer datos del formulario para generar el documento
     console.log('Extrayendo datos del formulario...')
-    const documentData: any = {}
+    const documentData: FormDataBag = {}
     const anexoFiles: File[] = []
-    const imageFiles: any[] = []
-    let imageMetadata: any[] = []
+    const imageFiles: ExtractedImage[] = []
+    let imageMetadata: ImageMetadataEntry[] = []
     
     for (const [key, value] of formData.entries()) {
       if (key === 'anexos' && value instanceof File) {
@@ -80,10 +81,10 @@ export async function POST(request: NextRequest) {
     imageFiles.forEach(imgFile => {
       const metadata = imageMetadata.find(m => m.id === imgFile.index)
       if (metadata) {
-        imgFile.width = metadata.width
-        imgFile.height = metadata.height
-        imgFile.name = metadata.name
-        console.log(`Metadatos aplicados a imagen ${imgFile.index}: ${metadata.width}x${metadata.height}`)
+        imgFile.width = metadata.width ?? imgFile.width
+        imgFile.height = metadata.height ?? imgFile.height
+        imgFile.name = metadata.name ?? imgFile.name
+        console.log(`Metadatos aplicados a imagen ${imgFile.index}: ${imgFile.width}x${imgFile.height}`)
       }
     })
     
@@ -104,17 +105,17 @@ export async function POST(request: NextRequest) {
     // Generar documento Word con imágenes
     let documentBlob: Blob
     try {
-      let hechos: any = formData.get('hechos')
-      let hechosArray = undefined
-      if (hechos) {
+      const hechosRaw = formData.get('hechos')
+      let hechosArray: HechoInput[] | undefined
+      if (hechosRaw) {
         try {
-          hechosArray = JSON.parse(hechos as string)
+          hechosArray = JSON.parse(hechosRaw as string) as HechoInput[]
         } catch (e) {
           console.error('Error parseando Hechos:', e)
           hechosArray = undefined
         }
       }
-      hechosArray.forEach((hecho: any) => {
+      hechosArray?.forEach((hecho) => {
         // Procesar cada hecho
         console.log(`Procesando hecho: ${hecho.descripcionHecho} con ID ${hecho.id}`)
       })

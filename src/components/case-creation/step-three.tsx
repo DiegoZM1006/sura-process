@@ -2,23 +2,18 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Eye, Download, Mail, FileText } from "lucide-react"
+import { Download, Mail, FileText } from "lucide-react"
+import { toast } from "sonner"
 import TiptapEditor from "@/components/tiptap-editor"
 import { EmailModal } from "./email-modal"
-import { generateDocument } from "@/lib/document-generator"
 import { getDefaultAnexosContent } from '@/components/tiptap-editor'
+import { createCase, ApiError } from "@/lib/api-client"
+import type { CaseFormData, DocumentImage } from "./types"
 
 interface Hecho {
   id: string;
   descripcionHecho: string;
-  fotoHecho?: {
-    id: string;
-    name: string;
-    data: string;
-    file: File;
-    width: number;
-    height: number;
-  } | null;
+  fotoHecho?: DocumentImage | null;
 }
 
 interface StepThreeProps {
@@ -26,8 +21,8 @@ interface StepThreeProps {
   onFinish: () => void
   currentStep: number
   caseType?: string
-  formData?: any
-  documentImages?: any[] // Nueva prop para las imágenes
+  formData?: CaseFormData
+  documentImages?: DocumentImage[] // Nueva prop para las imágenes
 }
 
 interface EmailData {
@@ -38,11 +33,32 @@ interface EmailData {
   videos: File[]
 }
 
-export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formData, documentImages = [] }: StepThreeProps) {
+/**
+ * Vuelca los campos de `CaseFormData` en un `FormData` nativo: los anexos
+ * (archivos) uno por uno bajo la clave 'anexos', y el resto de campos con
+ * valor como texto. Usado tanto al descargar el Word como al enviarlo por
+ * correo, para no duplicar la misma lógica dos veces.
+ */
+function appendCaseFormFields(target: FormData, source: CaseFormData) {
+  ;(Object.keys(source) as Array<keyof CaseFormData>).forEach((key) => {
+    const fieldValue = source[key]
+    if (key === 'anexos' && Array.isArray(fieldValue)) {
+      fieldValue.forEach((file) => {
+        target.append('anexos', file)
+      })
+    } else if (fieldValue) {
+      target.append(key, fieldValue as string)
+    }
+  })
+}
+
+// `currentStep` forma parte del contrato del wizard (el padre siempre lo
+// envía) aunque este último paso no lo necesite para renderizarse.
+export function StepThree({ onPrev, onFinish, caseType = "", formData, documentImages = [] }: StepThreeProps) {
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isDownloadingWord, setIsDownloadingWord] = useState(false)
-  const [currentDocumentImages, setCurrentDocumentImages] = useState<any[]>(documentImages)
+  const [currentDocumentImages, setCurrentDocumentImages] = useState<DocumentImage[]>(documentImages)
   const [currentHechos, setCurrentHechos] = useState<Hecho[]>([])
   
   // Estado para los contenidos de los tabs, inicializando anexos con valor por defecto
@@ -56,7 +72,7 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
   }
 
   // Handler para cambios en las imágenes (para tabs que no son hechos)
-  const handleImagesChange = (images: any[]) => {
+  const handleImagesChange = (images: DocumentImage[]) => {
     setCurrentDocumentImages(images)
     console.log('Imágenes actualizadas en Step 3:', images.length)
   }
@@ -72,18 +88,11 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
     try {
       // Crear FormData con los datos del formulario y anexos
       const formDataForDownload = new FormData()
-      
+
       // Agregar datos del formulario
-      Object.keys(formData).forEach(key => {
-        if (key === 'anexos' && formData[key]) {
-          // Agregar cada archivo anexo
-          formData[key].forEach((file: File) => {
-            formDataForDownload.append('anexos', file)
-          })
-        } else if (formData[key]) {
-          formDataForDownload.append(key, formData[key])
-        }
-      })
+      if (formData) {
+        appendCaseFormFields(formDataForDownload, formData)
+      }
       
       // Agregar el contenido de anexos como 'contenidoAnexos'
       if (tabContents.anexos) {
@@ -179,18 +188,11 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
     try {
       // Crear FormData con los datos del formulario y del email
       const formDataWithEmail = new FormData()
-      
+
       // Agregar datos del formulario
-      Object.keys(formData).forEach(key => {
-        if (key === 'anexos' && formData[key]) {
-          // Agregar cada archivo anexo
-          formData[key].forEach((file: File) => {
-            formDataWithEmail.append('anexos', file)
-          })
-        } else if (formData[key]) {
-          formDataWithEmail.append(key, formData[key])
-        }
-      })
+      if (formData) {
+        appendCaseFormFields(formDataWithEmail, formData)
+      }
       
       // Agregar el contenido de anexos como 'contenidoAnexos'
       if (tabContents.anexos) {
@@ -289,10 +291,28 @@ export function StepThree({ onPrev, onFinish, currentStep, caseType = "", formDa
       }
       
       console.log('Email enviado exitosamente:', result)
-      
+
+      // Registrar el caso en el backend (btl-sura-backend) usando el
+      // messageId del correo recién enviado como identificador único.
+      try {
+        await createCase({
+          type: caseType || 'CASO',
+          companyName: formData?.nombreEmpresa || 'Sin especificar',
+          messageId: result.messageId,
+        })
+        toast.success('Caso registrado correctamente en el sistema')
+      } catch (caseError) {
+        console.error('Error al registrar el caso en el backend:', caseError)
+        toast.error(
+          caseError instanceof ApiError
+            ? `El correo se envió, pero no se pudo registrar el caso: ${caseError.message}`
+            : 'El correo se envió, pero no se pudo registrar el caso en el sistema.'
+        )
+      }
+
       // Finalizar el caso después del envío exitoso
       onFinish()
-      
+
       return Promise.resolve()
     } catch (error) {
       console.error('Error al enviar email:', error)

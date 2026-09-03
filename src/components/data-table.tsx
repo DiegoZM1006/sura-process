@@ -33,7 +33,6 @@ import {
   IconGripVertical,
   IconLayoutColumns,
   IconLoader,
-  IconPlus,
   IconTrash,
   IconTrendingUp,
 } from "@tabler/icons-react"
@@ -240,7 +239,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
     id: "actions",
     header: "Acciones",
-    cell: ({ row }) => (
+    cell: () => (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
